@@ -1,11 +1,35 @@
 import { motion } from 'framer-motion'
+import { useEffect, useRef } from 'react'
 import { useGame } from '../../context/GameContext'
+import { supabase } from '../../lib/supabase'
 
 export default function EliminationCheckScreen() {
-  const { players, gameState } = useGame()
+  const { players, gameState, isHost, room } = useGame()
+  const checkCalledRef = useRef(false)
   const eliminatedThisRound = players.filter(p =>
     p.status === 'eliminated' && (p as unknown as { elimination_round?: number }).elimination_round === gameState.round_number
   )
+
+  // Host calls check-win after animation completes
+  useEffect(() => {
+    if (!isHost || checkCalledRef.current) return
+    const timer = setTimeout(async () => {
+      if (checkCalledRef.current) return
+      checkCalledRef.current = true
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/check-win`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session?.access_token}`,
+          },
+          body: JSON.stringify({ room_id: room.id, round_number: gameState.round_number }),
+        })
+      } catch { /* game state revert handled upstream */ }
+    }, 4000)
+    return () => clearTimeout(timer)
+  }, [isHost, room.id, gameState.round_number])
 
   return (
     <div style={{

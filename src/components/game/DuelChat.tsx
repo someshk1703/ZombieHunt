@@ -89,12 +89,12 @@ export default function DuelChat({ isOpen, onToggle, opponent, isNegotiating, my
           transition={{ duration: 0.2 }}
           style={{
             position: 'absolute', left: 0, top: 0, bottom: 0, width: '260px', zIndex: 5,
-            background: 'var(--color-surface-grey)', borderRight: '1px solid var(--color-border)',
+            background: '#1E1E24', borderRight: '1px solid var(--color-border)',
             backdropFilter: 'blur(4px)', display: 'flex', flexDirection: 'column',
           }}
         >
           {/* Header */}
-          <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid var(--color-border)' }}>
+          <div style={{ padding: '12px 12px 8px', borderBottom: '1px solid var(--color-border)', background: '#22222c' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span style={{ fontFamily: "'Bebas Neue', cursive", fontSize: '16px', color: 'var(--color-text)' }}>DUEL COMMS</span>
               <button onClick={onToggle} style={{ background: 'none', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', fontSize: '14px' }}>✕</button>
@@ -108,13 +108,13 @@ export default function DuelChat({ isOpen, onToggle, opponent, isNegotiating, my
           </div>
 
           {/* Messages */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: '8px 12px', background: 'rgba(22,22,26,0.8)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <div style={{ flex: 1, overflowY: 'auto', padding: '8px 12px', background: '#181820', display: 'flex', flexDirection: 'column', gap: '6px' }}>
             {messages.map(m => (
               <div key={m.id} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                 <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '9px', color: m.sender_id === user?.id ? 'var(--color-red)' : 'var(--color-text-muted)' }}>
                   {m.username}
                 </span>
-                <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '11px', color: 'var(--color-text)', wordBreak: 'break-word', background: m.sender_id === user?.id ? 'rgba(40,20,20,0.8)' : 'rgba(36,36,42,0.9)', border: m.sender_id === user?.id ? '1px solid rgba(204,0,0,0.15)' : '1px solid rgba(255,255,255,0.06)', padding: '4px 8px', display: 'inline-block' }}>
+                <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '11px', color: 'var(--color-text)', wordBreak: 'break-word', background: m.sender_id === user?.id ? '#2a1a1e' : '#252530', border: m.sender_id === user?.id ? '1px solid rgba(204,0,0,0.15)' : '1px solid rgba(255,255,255,0.06)', padding: '4px 8px', display: 'inline-block' }}>
                   {m.message}
                 </span>
               </div>
@@ -123,7 +123,7 @@ export default function DuelChat({ isOpen, onToggle, opponent, isNegotiating, my
           </div>
 
           {/* Input */}
-          <div style={{ padding: '8px 12px', borderTop: '1px solid rgba(255,255,255,0.06)', background: 'rgba(20,20,24,0.95)', display: 'flex', gap: '6px' }}>
+          <div style={{ padding: '8px 12px', borderTop: '1px solid rgba(255,255,255,0.06)', background: '#16161c', display: 'flex', gap: '6px' }}>
             <input
               value={input}
               onChange={e => setInput(e.target.value)}
@@ -131,7 +131,7 @@ export default function DuelChat({ isOpen, onToggle, opponent, isNegotiating, my
               maxLength={160}
               placeholder="Make your move..."
               style={{
-                flex: 1, background: 'rgba(14,14,18,0.9)', border: '1px solid rgba(255,255,255,0.08)',
+                flex: 1, background: '#0e0e14', border: '1px solid rgba(255,255,255,0.08)',
                 color: 'var(--color-text)', padding: '6px 8px', fontFamily: "'IBM Plex Mono', monospace",
                 fontSize: '11px', outline: 'none',
               }}

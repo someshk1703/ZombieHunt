@@ -36,14 +36,23 @@ function cardLabel(card: Card): string {
   return `${val} OF ${card.suit?.toUpperCase() ?? ''}`
 }
 
-function generatePairs(players: { id: string; status: string }[]) {
-  const alive = players.filter(p => p.status === 'alive' || p.status === 'infected')
-  const shuffled = [...alive].sort(() => Math.random() - 0.5)
+function generatePairs(players: { id: string; status: string; is_bot?: boolean }[]) {
+  const SUBJECT_ZERO_UUID_PREFIX = '00000000'
+  const sz = players.find(p => p.is_bot)
+  const humanAlive = players.filter(p =>
+    !p.is_bot && (p.status === 'alive' || p.status === 'infected')
+  )
+  const shuffled = [...humanAlive].sort(() => Math.random() - 0.5)
   const pairs: string[][] = []
   for (let i = 0; i < shuffled.length - 1; i += 2) {
     pairs.push([shuffled[i].id, shuffled[i + 1].id])
   }
-  const bye = shuffled.length % 2 !== 0 ? shuffled[shuffled.length - 1].id : null
+  // Pair odd-one-out with Subject Zero bot
+  if (shuffled.length % 2 !== 0 && sz) {
+    pairs.push([shuffled[shuffled.length - 1].id, sz.id])
+  }
+  const bye = shuffled.length % 2 !== 0 && !sz ? shuffled[shuffled.length - 1].id : null
+  void SUBJECT_ZERO_UUID_PREFIX // suppress unused warning
   return { pairs, bye }
 }
 

@@ -42,20 +42,47 @@ Deno.serve(async (req) => {
 
     // 3. Validate player count >= 3
     const { data: players, error: playersErr } = await supabase
-      .from('players').select('id, user_id').eq('room_id', room_id)
+      .from('players').select('id, user_id').eq('room_id', room_id).eq('is_bot', false)
     if (playersErr || !players || players.length < 3) {
       return new Response(JSON.stringify({ error: 'Need at least 3 players' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
+    // 3.5 Create Subject Zero bot if odd player count
+    const SUBJECT_ZERO_UUID = '00000000-0000-0000-0000-000000000000'
+    if (players.length % 2 !== 0) {
+      const { data: existing } = await supabase
+        .from('players').select('id').eq('room_id', room_id).eq('user_id', SUBJECT_ZERO_UUID).maybeSingle()
+      if (!existing) {
+        await supabase.from('players').insert({
+          room_id,
+          user_id: SUBJECT_ZERO_UUID,
+          username: 'SUBJECT ZERO',
+          avatar_url: 'https://api.dicebear.com/7.x/bottts/svg?seed=subjectzero&backgroundColor=0a1f0a',
+          status: 'alive',
+          lives: 999,
+          is_bot: true,
+          is_host: false,
+          is_ready: true,
+          hand: [],
+          score: 0,
+        })
+      }
+    }
+
+    // Re-fetch all players including bot
+    const { data: allPlayersData } = await supabase
+      .from('players').select('id, user_id').eq('room_id', room_id)
+    const allPlayers = allPlayersData ?? players
+
     // 4. Set room status to playing
     await supabase.from('rooms').update({ status: 'playing' }).eq('id', room_id)
     roomUpdated = true
 
     // 5. Deal cards inline
-    const dealSummary = await dealCards(supabase, players)
-    console.log('[start-game] deal summary:', JSON.stringify({ ...dealSummary, zombiePlayers: '[REDACTED]' }))
+    const dealSummary = await dealCards(supabase, allPlayers)
+    console.log('[start-game] deal summary:', JSON.stringify({ ...dealSummary, zombiePlayers: '[REDACTED]', totalPlayers: allPlayers.length }))
 
     // 6. Create game_state with phase='deal' (15s for dealing animation + hand review)
     const phaseDeadline = new Date(Date.now() + 15000).toISOString()

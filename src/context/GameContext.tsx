@@ -118,6 +118,10 @@ export function GameProvider({ room, initialPlayers, gameState: initialGameState
   useEffect(() => {
     const channel = supabase
       .channel(`players-game-${room.id}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'players', filter: `room_id=eq.${room.id}` }, payload => {
+        const inserted = payload.new as GamePlayer
+        setPlayers(prev => prev.some(p => p.id === inserted.id) ? prev : [...prev, inserted])
+      })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'players', filter: `room_id=eq.${room.id}` }, payload => {
         const updated = payload.new as GamePlayer
         setPlayers(prev => prev.map(p => p.id === updated.id ? updated : p))

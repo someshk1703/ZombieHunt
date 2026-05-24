@@ -48,6 +48,9 @@ function PlayerCard({
     cursor: 'default',
     position: 'relative',
     flexShrink: 0,
+    background: isSelf ? '#220e0e' : '#1C1C22',
+    border: `1px solid ${isSelf ? '#4a1a1a' : '#3a3a44'}`,
+    ...(isHostViewer && { borderTop: '2px solid #ff6b00' }),
   }
 
   if (!player) {
@@ -104,13 +107,13 @@ function PlayerCard({
         <img
           src={player.avatar_url}
           alt={player.username}
-          style={{ width: '64px', height: '64px', margin: '0 auto 8px auto', border: '1px solid #3a3a3a', background: '#0a0a0a', flexShrink: 0, display: 'block' }}
+          style={{ width: '64px', height: '64px', margin: '0 auto 8px auto', border: '2px solid rgba(255,255,255,0.12)', background: '#0a0a0a', flexShrink: 0, display: 'block' }}
         />
         {/* Username */}
         <span className="player-username" style={{
           fontFamily: "'IBM Plex Mono', monospace",
           fontSize: '12px',
-          color: 'var(--color-text)',
+          color: '#f0f0f0',
           maxWidth: '112px',
           overflow: 'hidden',
           textOverflow: 'ellipsis',

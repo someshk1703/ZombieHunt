@@ -22,7 +22,7 @@
   /* Surface contrast */
   --color-surface-red:   rgba(28,8,8,0.92);
   --color-surface-green: rgba(8,18,8,0.92);
-  --color-surface-grey:  rgba(28,28,32,0.95);
+  --color-surface-grey:  #1E1E24;
   --color-surface-glow:  rgba(204,0,0,0.05);
 
   /* Zone borders */

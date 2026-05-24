@@ -90,7 +90,7 @@ export default function LobbyChat({ roomId, initialMessages }: LobbyChatProps) {
   }
 
   const panelStyle: React.CSSProperties = {
-    background: 'var(--color-surface-grey)',
+    background: '#1E1E24',
     border: '1px solid var(--color-border)',
     display: 'flex',
     flexDirection: 'column',
@@ -102,14 +102,14 @@ export default function LobbyChat({ roomId, initialMessages }: LobbyChatProps) {
   return (
     <div style={panelStyle}>
       {/* Header */}
-      <div style={{ padding: '16px', borderBottom: '1px solid var(--color-border)', flexShrink: 0 }}>
+      <div style={{ padding: '16px', borderBottom: '1px solid var(--color-border)', flexShrink: 0, background: '#22222c' }}>
         <span style={{ fontFamily: "'Bebas Neue', cursive", fontSize: '18px', color: 'var(--color-text)', letterSpacing: '0.05em' }}>
           COMMS
         </span>
       </div>
 
       {/* Reaction bar */}
-      <div style={{ display: 'flex', gap: '4px', padding: '8px 12px', borderBottom: '1px solid rgba(255,255,255,0.05)', background: 'rgba(20,20,24,0.9)', flexShrink: 0 }}>
+      <div style={{ display: 'flex', gap: '4px', padding: '8px 12px', borderBottom: '1px solid rgba(255,255,255,0.05)', background: '#1a1a22', flexShrink: 0 }}>
         {REACTIONS.map(emoji => (
           <button
             key={emoji}
@@ -134,7 +134,7 @@ export default function LobbyChat({ roomId, initialMessages }: LobbyChatProps) {
         onScroll={handleScroll}
         style={{
           flex: 1, overflowY: 'auto', padding: '12px',
-          background: 'rgba(22,22,26,0.8)',
+          background: '#181820',
           scrollbarWidth: 'thin',
           scrollbarColor: 'var(--color-border) var(--color-bg)',
           position: 'relative',
@@ -197,7 +197,7 @@ export default function LobbyChat({ roomId, initialMessages }: LobbyChatProps) {
                 <div
                   title={formatTime(msg.created_at)}
                   style={{
-                    background: isSelf ? 'rgba(40,20,20,0.8)' : 'rgba(36,36,42,0.9)',
+                    background: isSelf ? '#2a1a1e' : '#252530',
                     border: isSelf ? '1px solid rgba(204,0,0,0.15)' : '1px solid rgba(255,255,255,0.06)',
                     padding: '6px 10px',
                     fontFamily: "'IBM Plex Mono', monospace",
@@ -232,10 +232,10 @@ export default function LobbyChat({ roomId, initialMessages }: LobbyChatProps) {
       )}
 
       {/* Chat input */}
-      <div style={{ padding: '12px', borderTop: '1px solid rgba(255,255,255,0.06)', background: 'rgba(20,20,24,0.95)', display: 'flex', gap: '8px', flexShrink: 0 }}>
+      <div style={{ padding: '12px', borderTop: '1px solid rgba(255,255,255,0.06)', background: '#16161c', display: 'flex', gap: '8px', flexShrink: 0 }}>
         <input
           className="input-base"
-          style={{ flex: 1, fontSize: '12px', padding: '8px 12px', background: 'rgba(14,14,18,0.9)', border: '1px solid rgba(255,255,255,0.08)' }}
+          style={{ flex: 1, fontSize: '12px', padding: '8px 12px', background: '#0e0e14', border: '1px solid rgba(255,255,255,0.08)' }}
           placeholder="Say something..."
           maxLength={200}
           value={input}

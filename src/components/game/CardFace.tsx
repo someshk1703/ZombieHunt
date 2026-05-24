@@ -145,6 +145,8 @@ export default function CardFace({ card, size = 'md', style }: CardFaceProps) {
                 <img
                   src={`/assets/cards/${card.type}.png`}
                   alt={card.type}
+                  draggable={false}
+                  onDragStart={e => e.preventDefault()}
                   onError={() => setImgError(true)}
                   style={{
                     width: '100%',
@@ -152,6 +154,8 @@ export default function CardFace({ card, size = 'md', style }: CardFaceProps) {
                     objectFit: 'cover',
                     objectPosition: 'center top',
                     display: 'block',
+                    userSelect: 'none',
+                    pointerEvents: 'none',
                   }}
                 />
               </div>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { DndContext, DragEndEvent, useDroppable, DragOverlay, useSensor, useSensors, PointerSensor, TouchSensor } from '@dnd-kit/core'
 import { useGame } from '../../context/GameContext'
@@ -66,14 +66,25 @@ export default function GameRoundScreen() {
   const [isNegotiating, setIsNegotiating] = useState(true)
   const [chatOpen, setChatOpen] = useState(true)
   const [infectionPayload, setInfectionPayload] = useState<{ infector_username: string; round: number } | null>(null)
+  const revealCalledRef = useRef(false)
+
+  // Reset local state when round advances
+  useEffect(() => {
+    setPlayZoneSlots([null, null, null, null])
+    setCommitted(false)
+    setOpponentCommitted(false)
+    setIsNegotiating(true)
+    setChatOpen(true)
+    revealCalledRef.current = false
+  }, [gameState.round_number])
 
   // Find my opponent in current pairs
-  const myPair = (gameState.pairs ?? []).find(pair => {
-    const pA = players.find(p => p.id === pair[0])
-    const pB = players.find(p => p.id === pair[1])
-    return pA?.user_id === user?.id || pB?.user_id === user?.id
-  })
-  const opponentId = myPair ? (players.find(p => p.id === myPair[0])?.user_id === user?.id ? myPair[1] : myPair[0]) : null
+  const myPair = (gameState.pairs ?? []).find(pair =>
+    Array.isArray(pair) && pair.includes(myPlayer.id)
+  )
+  const opponentId = myPair
+    ? (myPair[0] === myPlayer.id ? myPair[1] : myPair[0])
+    : null
   const opponent = opponentId ? players.find(p => p.id === opponentId) : null
 
   // Timer logic
@@ -96,6 +107,12 @@ export default function GameRoundScreen() {
           }
         } else if (!committed) {
           autoCommit()
+        } else if (isHost && !revealCalledRef.current) {
+          // All players should have committed by now — advance to reveal
+          revealCalledRef.current = true
+          setTimeout(async () => {
+            await supabase.from('game_state').update({ phase: 'reveal' }).eq('id', gameState.id)
+          }, 3000)
         }
       }
     }, 500)
