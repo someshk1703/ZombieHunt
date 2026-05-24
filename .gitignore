@@ -1,0 +1,36 @@
+node_modules/
+dist/
+dist-ssr/
+build/
+.vite/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Editor
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# TypeScript
+*.tsbuildinfo
+
+# Supabase
+supabase/.branches/
+supabase/.temp/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+
+# Test coverage
+coverage/
+
+# mdFiles — documentation prompts, excluded from repo
+mdFiles/
+

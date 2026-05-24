@@ -1,0 +1,74 @@
+/* Glitch effects for ZombieHunt */
+
+/* Keyframes */
+@keyframes glitch-clip-1 {
+  0%, 100% { clip-path: inset(0 0 95% 0); transform: translateX(-4px); }
+  50%       { clip-path: inset(0 0 95% 0); transform: translateX(4px); }
+}
+@keyframes glitch-clip-2 {
+  0%, 100% { clip-path: inset(90% 0 0 0); transform: translateX(4px); }
+  50%       { clip-path: inset(90% 0 0 0); transform: translateX(-4px); }
+}
+@keyframes glitch-skew {
+  0%, 49%, 100% { transform: skewX(0); }
+  50%            { transform: skewX(-2deg); }
+}
+@keyframes glitch-border-flicker {
+  0%, 90%, 100% { border-color: var(--color-red); }
+  92%           { border-color: var(--color-green); }
+  94%           { border-color: var(--color-red); }
+}
+
+/* Subtle — barely noticeable, used for borders / decorative elements */
+.glitch-text-subtle {
+  animation: glitch-skew 6s infinite linear;
+}
+.glitch-text-subtle::before,
+.glitch-text-subtle::after {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  opacity: 0.08;
+}
+.glitch-text-subtle::before { animation: glitch-clip-1 3s infinite; color: var(--color-red); }
+.glitch-text-subtle::after  { animation: glitch-clip-2 3s infinite; color: var(--color-green); }
+
+/* Normal — moderate glitch, for headers / game events */
+.glitch-text-normal {
+  position: relative;
+  animation: glitch-skew 3s infinite linear;
+}
+.glitch-text-normal::before,
+.glitch-text-normal::after {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  opacity: 0.2;
+}
+.glitch-text-normal::before { animation: glitch-clip-1 1.5s infinite; color: var(--color-red); }
+.glitch-text-normal::after  { animation: glitch-clip-2 1.5s infinite; color: var(--color-green); }
+
+/* Intense — high-visibility glitch, for death/elimination events */
+.glitch-text-intense {
+  position: relative;
+  animation: glitch-skew 1s infinite linear;
+}
+.glitch-text-intense::before,
+.glitch-text-intense::after {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  opacity: 0.5;
+}
+.glitch-text-intense::before { animation: glitch-clip-1 0.5s infinite; color: var(--color-red); }
+.glitch-text-intense::after  { animation: glitch-clip-2 0.5s infinite; color: var(--color-green); }
+
+/* Trigger — class added programmatically to fire one-shot glitch */
+.glitch-trigger {
+  animation: glitch-skew 0.4s linear !important;
+}
+
+/* Border glitch variant */
+.glitch-border {
+  animation: glitch-border-flicker 4s infinite;
+}

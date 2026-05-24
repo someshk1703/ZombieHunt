@@ -1,0 +1,60 @@
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
+import { useEffect } from 'react'
+import { useAuth } from './lib/auth'
+import { useGameStore } from './store/gameStore'
+import { ToastProvider } from './components/Toast'
+import AtmosphericBackground from './components/AtmosphericBackground'
+import LoadingScreen from './components/LoadingScreen'
+import AudioControls from './components/AudioControls'
+import Home from './pages/Home'
+import CreateRoom from './pages/CreateRoom'
+import QuickPlay from './pages/QuickPlay'
+import WaitingRoom from './pages/WaitingRoom'
+import Game from './pages/Game'
+import Results from './pages/Results'
+
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { username } = useGameStore()
+  const navigate = useNavigate()
+  useEffect(() => {
+    if (!username) navigate('/', { replace: true })
+  }, [username, navigate])
+  if (!username) return null
+  return <>{children}</>
+}
+
+function AppRoutes() {
+  return (
+    <Routes>
+      <Route path="/" element={<Home />} />
+      <Route path="/lobby/create" element={<ProtectedRoute><CreateRoom /></ProtectedRoute>} />
+      <Route path="/quickplay" element={<ProtectedRoute><QuickPlay /></ProtectedRoute>} />
+      <Route path="/room/:code" element={<WaitingRoom />} />
+      <Route path="/game/:code" element={<ProtectedRoute><Game /></ProtectedRoute>} />
+      <Route path="/results/:code" element={<ProtectedRoute><Results /></ProtectedRoute>} />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  )
+}
+
+export default function App() {
+  const { user, loading } = useAuth()
+  const { setUser } = useGameStore()
+
+  useEffect(() => {
+    if (user) setUser({ id: user.id })
+  }, [user, setUser])
+
+  return (
+    <BrowserRouter>
+      <ToastProvider>
+        <AtmosphericBackground />
+        <LoadingScreen visible={loading} />
+        <div style={{ position: 'relative', zIndex: 1, minHeight: '100vh' }}>
+          <AppRoutes />
+        </div>
+        <AudioControls />
+      </ToastProvider>
+    </BrowserRouter>
+  )
+}
