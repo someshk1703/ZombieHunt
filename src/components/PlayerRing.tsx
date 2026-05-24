@@ -314,23 +314,31 @@ export default function PlayerRing({
             {myPlayer.is_ready ? '✓ READY' : 'MARK AS READY'}
           </button>
         )}
-        {isHost && players.length >= 3 && (
-          <div style={{ position: 'relative', display: 'inline-block' }}>
+        {isHost && (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
             <button
-              className="btn-secondary"
+              className="btn-primary"
               onClick={onForceStart}
-              style={{ fontSize: '12px', letterSpacing: '0.08em' }}
+              disabled={players.length < 3}
+              style={{
+                fontSize: '13px',
+                letterSpacing: '0.1em',
+                padding: '10px 28px',
+                opacity: players.length < 3 ? 0.4 : 1,
+                cursor: players.length < 3 ? 'not-allowed' : 'pointer',
+              }}
             >
-              ⚡ FORCE START
+              ▶ START GAME
             </button>
             <span style={{
-              position: 'absolute', bottom: '-20px', left: '50%',
-              transform: 'translateX(-50%)',
               fontFamily: "'IBM Plex Mono', monospace",
-              fontSize: '10px', color: 'var(--color-text-muted)',
-              whiteSpace: 'nowrap',
+              fontSize: '10px',
+              color: 'var(--color-text-muted)',
+              textAlign: 'center',
             }}>
-              Start without waiting for all to ready up
+              {players.length < 3
+                ? `Need ${3 - players.length} more player${3 - players.length === 1 ? '' : 's'}`
+                : 'Starts immediately — skips ready check'}
             </span>
           </div>
         )}
