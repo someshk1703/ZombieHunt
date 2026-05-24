@@ -34,3 +34,5 @@ coverage/
 # mdFiles — documentation prompts, excluded from repo
 mdFiles/
 
+.vercel
+package-lock.json
