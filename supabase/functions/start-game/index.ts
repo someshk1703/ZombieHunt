@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { dealCards } from '../deal-cards/index.ts'
+import { dealCards } from '../_shared/dealCards.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',

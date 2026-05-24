@@ -260,6 +260,22 @@ export default function WaitingRoom() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [room])
 
+  async function handleLeave() {
+    if (!myPlayer || !room) return
+    if (isHost) {
+      // Transfer host to next player, or delete room if alone
+      const others = players.filter(p => p.user_id !== user?.id)
+      if (others.length > 0) {
+        await supabase.from('players').update({ is_host: true }).eq('id', others[0].id)
+        await supabase.from('rooms').update({ host_id: others[0].user_id }).eq('id', room.id)
+      } else {
+        await supabase.from('rooms').delete().eq('id', room.id)
+      }
+    }
+    await supabase.from('players').delete().eq('id', myPlayer.id)
+    navigate('/')
+  }
+
   function copyCode() {
     if (!room) return
     navigator.clipboard.writeText(`${window.location.origin}/room/${room.code}`)
@@ -329,11 +345,20 @@ export default function WaitingRoom() {
               </button>
             </div>
           </div>
-          {isHost && room.status === 'lobby' && (
-            <button className="btn-secondary" style={{ fontSize: '12px' }} onClick={() => setDrawerOpen(true)}>
-              ⚙ SETTINGS
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            {isHost && room.status === 'lobby' && (
+              <button className="btn-secondary" style={{ fontSize: '12px' }} onClick={() => setDrawerOpen(true)}>
+                ⚙ SETTINGS
+              </button>
+            )}
+            <button
+              className="btn-secondary"
+              style={{ fontSize: '12px', borderColor: 'var(--color-red)', color: 'var(--color-red)' }}
+              onClick={handleLeave}
+            >
+              ✕ LEAVE
             </button>
-          )}
+          </div>
         </div>
 
         {/* Three-column grid */}
