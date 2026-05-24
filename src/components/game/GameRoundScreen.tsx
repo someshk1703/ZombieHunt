@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { DndContext, DragEndEvent, useDroppable, DragOverlay, useSensor, useSensors, PointerSensor, TouchSensor } from '@dnd-kit/core'
 import { useGame } from '../../context/GameContext'
 import { supabase } from '../../lib/supabase'
 import { Card } from '../../store/gameStore'
@@ -11,12 +12,53 @@ import DuelChat from './DuelChat'
 import InfectionAlert from './InfectionAlert'
 import { useToast } from '../Toast'
 
+const MAX_SLOTS = 4
+
+function DroppableSlot({ id, card, onRemove, committed }: { id: string; card: Card | null; onRemove: (card: Card) => void; committed: boolean }) {
+  const { setNodeRef, isOver } = useDroppable({ id })
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        width: '72px', height: '100px',
+        border: `1.5px dashed ${isOver ? 'var(--color-red)' : card ? '#505055' : '#383838'}`,
+        background: isOver ? 'rgba(204,0,0,0.08)' : card ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.01)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        position: 'relative', transition: 'border-color 150ms, background 150ms',
+        boxShadow: isOver ? '0 0 8px rgba(204,0,0,0.2)' : 'none',
+      }}
+    >
+      {card ? (
+        <>
+          <CardFace card={card} size="sm" />
+          {!committed && (
+            <button
+              onClick={() => onRemove(card)}
+              style={{
+                position: 'absolute', top: '-7px', right: '-7px',
+                width: '18px', height: '18px', background: 'var(--color-red)',
+                border: 'none', color: '#fff', fontSize: '11px', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1,
+                boxShadow: '0 1px 4px rgba(0,0,0,0.6)',
+              }}
+            >×</button>
+          )}
+        </>
+      ) : (
+        <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '9px', color: '#383838', letterSpacing: '0.1em' }}>
+          SLOT {parseInt(id.split('-')[1]) + 1}
+        </span>
+      )}
+    </div>
+  )
+}
+
 export default function GameRoundScreen() {
   const { gameState, myPlayer, players, room, isHost, myHand } = useGame()
   const { user } = useGameStore()
   const { showToast } = useToast()
 
-  const [playZoneCards, setPlayZoneCards] = useState<Card[]>([])
+  const [playZoneSlots, setPlayZoneSlots] = useState<(Card | null)[]>([null, null, null, null])
   const [committed, setCommitted] = useState(false)
   const [opponentCommitted, setOpponentCommitted] = useState(false)
   const [timeLeft, setTimeLeft] = useState<number>(0)
@@ -105,6 +147,9 @@ export default function GameRoundScreen() {
     }
   }
 
+  const playZoneCards = playZoneSlots.filter((c): c is Card => c !== null)
+  const playZoneCardIds = new Set(playZoneCards.map(c => c.id))
+
   function handleCommit() {
     if (playZoneCards.length === 0 || committed) return
     doCommit(playZoneCards)
@@ -112,13 +157,50 @@ export default function GameRoundScreen() {
 
   function addToPlayZone(card: Card) {
     if (committed) return
-    setPlayZoneCards(prev => [...prev, card])
+    setPlayZoneSlots(prev => {
+      const emptyIdx = prev.findIndex(s => s === null)
+      if (emptyIdx === -1) return prev // all slots full
+      const next = [...prev]
+      next[emptyIdx] = card
+      return next
+    })
   }
 
   function removeFromPlayZone(card: Card) {
     if (committed) return
-    setPlayZoneCards(prev => prev.filter(c => c.id !== card.id))
+    setPlayZoneSlots(prev => prev.map(s => s?.id === card.id ? null : s))
   }
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 8 } })
+  )
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event
+    if (!over || committed || isNegotiating) return
+    const card: Card = active.data.current?.card
+    if (!card) return
+    const slotIndex = parseInt((over.id as string).split('-')[1])
+    if (isNaN(slotIndex)) return
+    setPlayZoneSlots(prev => {
+      // Don't add if already in zone
+      if (prev.some(s => s?.id === card.id)) return prev
+      // Don't exceed max
+      if (prev.filter(Boolean).length >= MAX_SLOTS) return prev
+      const next = [...prev]
+      // Place in specific slot, or find first empty
+      if (next[slotIndex] === null) {
+        next[slotIndex] = card
+      } else {
+        const emptyIdx = next.findIndex(s => s === null)
+        if (emptyIdx !== -1) next[emptyIdx] = card
+      }
+      return next
+    })
+  }
+
+  const [draggedCard, setDraggedCard] = useState<Card | null>(null)
 
   const numericTotal = playZoneCards.filter(c => c.type === 'number').reduce((s, c) => s + c.value, 0)
   const specialInZone = playZoneCards.find(c => c.type !== 'number')
@@ -130,8 +212,13 @@ export default function GameRoundScreen() {
 
   const infectionStatus = myPlayer.status === 'infected'
 
-
   return (
+    <DndContext
+      sensors={sensors}
+      onDragStart={event => setDraggedCard(event.active.data.current?.card ?? null)}
+      onDragEnd={event => { handleDragEnd(event); setDraggedCard(null) }}
+      onDragCancel={() => setDraggedCard(null)}
+    >
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--color-bg)', position: 'relative', overflow: 'hidden' }}>
       {/* Infection alert */}
       <AnimatePresence>
@@ -143,8 +230,9 @@ export default function GameRoundScreen() {
       {/* TOP BAR */}
       <div style={{
         height: '48px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '0 16px', background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)',
+        padding: '0 16px', background: '#141416', borderBottom: '1px solid #383838',
         position: 'sticky', top: 0, zIndex: 10, flexShrink: 0,
+        boxShadow: '0 2px 8px rgba(0,0,0,0.6)',
       }}>
         <div>
           <span style={{ fontFamily: "'Bebas Neue', cursive", fontSize: '18px', color: 'var(--color-red)' }}>
@@ -252,11 +340,11 @@ export default function GameRoundScreen() {
 
           {/* PLAYER ZONE (YOU) */}
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
               <img src={myPlayer.avatar_url} alt="You" style={{ width: '48px', height: '48px', borderRadius: '50%', border: '2px solid var(--color-red)' }} />
               <div>
                 <div style={{ fontFamily: "'Bebas Neue', cursive", fontSize: '18px', color: 'var(--color-text)' }}>
-                  YOU <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '9px', color: 'var(--color-red)', border: '1px solid var(--color-red)', padding: '1px 4px' }}>YOU</span>
+                  {myPlayer.username} <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '9px', color: 'var(--color-red)', border: '1px solid var(--color-red)', padding: '1px 4px' }}>YOU</span>
                 </div>
                 <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '11px', color: 'var(--color-text-muted)' }}>
                   {myHand.filter(c => !c.used).length} cards remaining
@@ -264,43 +352,28 @@ export default function GameRoundScreen() {
               </div>
             </div>
 
-            {/* Play zone */}
-            <div style={{
-              width: '200px', minHeight: '140px', border: `1px dashed ${!isNegotiating && !committed ? 'var(--color-red)' : 'var(--color-border)'}`,
-              position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-              background: 'rgba(255,255,255,0.02)', padding: '8px',
-              transition: 'border-color 300ms',
-            }}>
-              {playZoneCards.length === 0 ? (
-                <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '10px', color: 'var(--color-text-muted)' }}>
-                  {isNegotiating ? 'WAITING...' : 'DROP CARDS HERE'}
-                </span>
-              ) : (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', justifyContent: 'center' }}>
-                  {playZoneCards.map(card => (
-                    <div key={card.id} style={{ position: 'relative' }}>
-                      <CardFace card={card} size="sm" />
-                      {!committed && (
-                        <button
-                          onClick={() => removeFromPlayZone(card)}
-                          style={{
-                            position: 'absolute', top: '-6px', right: '-6px',
-                            width: '16px', height: '16px', background: 'var(--color-red)',
-                            border: 'none', color: '#fff', fontSize: '10px', cursor: 'pointer',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1,
-                          }}
-                        >×</button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
+            {/* 4-slot Play zone */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+              <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '10px', color: isNegotiating ? 'var(--color-text-muted)' : committed ? 'var(--color-green)' : 'var(--color-red)', letterSpacing: '0.12em' }}>
+                {isNegotiating ? '— NEGOTIATION PHASE —' : committed ? '✓ CARDS LOCKED IN' : '— DRAG OR TAP CARDS TO PLAY —'}
+              </span>
+              <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                {playZoneSlots.map((card, i) => (
+                  <DroppableSlot
+                    key={`slot-${i}`}
+                    id={`slot-${i}`}
+                    card={card}
+                    onRemove={removeFromPlayZone}
+                    committed={committed}
+                  />
+                ))}
+              </div>
             </div>
 
             {/* Running total */}
             {playZoneCards.length > 0 && (
-              <div style={{ marginTop: '8px', textAlign: 'center' }}>
-                <div style={{ fontFamily: "'Bebas Neue', cursive", fontSize: '20px', color: 'var(--color-text)' }}>
+              <div style={{ marginTop: '12px', textAlign: 'center' }}>
+                <div style={{ fontFamily: "'Bebas Neue', cursive", fontSize: '22px', color: 'var(--color-text)' }}>
                   TOTAL: {numericTotal}
                 </div>
                 {specialInZone && (
@@ -351,12 +424,16 @@ export default function GameRoundScreen() {
 
       {/* HAND PANEL */}
       <HandPanel
-        playZoneCardIds={new Set(playZoneCards.map(c => c.id))}
+        playZoneCardIds={playZoneCardIds}
         onAddToZone={addToPlayZone}
         onRemoveFromZone={removeFromPlayZone}
         committed={committed}
         isNegotiating={isNegotiating}
       />
     </div>
+    <DragOverlay dropAnimation={null}>
+      {draggedCard ? <CardFace card={draggedCard} size="sm" style={{ opacity: 0.85, boxShadow: '0 8px 24px rgba(0,0,0,0.8)' }} /> : null}
+    </DragOverlay>
+    </DndContext>
   )
 }

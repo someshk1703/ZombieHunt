@@ -3,6 +3,25 @@
 @media (max-width: 767px) {
 
   /* ============================
+     WaitingRoom — stack to single column
+     ============================ */
+  .waiting-room-grid {
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+  }
+
+  .waiting-room-header {
+    flex-direction: column !important;
+    gap: 8px !important;
+    align-items: flex-start !important;
+  }
+
+  .waiting-room-chat {
+    min-height: 200px !important;
+    max-height: 260px !important;
+  }
+
+  /* ============================
      GameRoundScreen — stacked layout
      ============================ */
   .game-round-main {

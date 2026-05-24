@@ -27,11 +27,11 @@ export default function DuelChat({ isOpen, onToggle, opponent, isNegotiating, my
   const [input, setInput] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
 
-  const myPlayerId = myPlayer.id
-  const opponentPlayerId = opponent?.id ?? null
+  const myUserId = myPlayer.user_id
+  const opponentUserId = opponent?.user_id ?? null
 
-  const playerAId = myPlayerId < (opponentPlayerId ?? '') ? myPlayerId : opponentPlayerId
-  const playerBId = myPlayerId > (opponentPlayerId ?? '') ? myPlayerId : opponentPlayerId
+  const playerAId = myUserId < (opponentUserId ?? '') ? myUserId : opponentUserId
+  const playerBId = myUserId > (opponentUserId ?? '') ? myUserId : opponentUserId
 
   // Load messages
   useEffect(() => {

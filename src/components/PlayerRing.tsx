@@ -38,12 +38,14 @@ function PlayerCard({
   const [kickConfirm, setKickConfirm] = React.useState(false)
 
   const cardStyle: React.CSSProperties = {
-    width: '80px',
-    height: '96px',
-    background: 'var(--color-surface)',
-    border: `1px solid ${isSelf ? 'var(--color-red)' : 'var(--color-border)'}`,
-    boxShadow: isSelf ? '0 0 8px var(--color-red-glow)' : 'none',
-    padding: '8px',
+    width: '96px',
+    height: '118px',
+    background: 'linear-gradient(160deg, #1c1c1e 0%, #141416 100%)',
+    border: `1.5px solid ${isSelf ? 'var(--color-red)' : '#3a3a3a'}`,
+    boxShadow: isSelf
+      ? '0 0 10px var(--color-red-glow), 0 4px 16px rgba(0,0,0,0.8)'
+      : '0 4px 16px rgba(0,0,0,0.8), inset 0 1px 0 rgba(255,255,255,0.05)',
+    padding: '8px 6px 6px',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
@@ -57,8 +59,8 @@ function PlayerCard({
     return (
       <div style={{
         ...cardStyle,
-        border: '1px dashed rgba(42,42,42,0.3)',
-        background: 'transparent',
+        border: '1.5px dashed rgba(58,58,58,0.4)',
+        background: 'rgba(20,20,22,0.4)',
         alignItems: 'center',
         justifyContent: 'center',
       }}>
@@ -95,23 +97,24 @@ function PlayerCard({
         <img
           src={player.avatar_url}
           alt={player.username}
-          style={{ width: '44px', height: '44px', border: '1px solid var(--color-border)', background: 'var(--color-bg)' }}
+          style={{ width: '40px', height: '40px', border: '1px solid #3a3a3a', background: '#0a0a0a', flexShrink: 0 }}
         />
         {/* Username */}
         <span style={{
           fontFamily: "'IBM Plex Mono', monospace",
           fontSize: '9px',
           color: 'var(--color-text)',
-          maxWidth: '68px',
+          width: '80px',
           overflow: 'hidden',
           textOverflow: 'ellipsis',
           whiteSpace: 'nowrap',
           textAlign: 'center',
+          lineHeight: 1.2,
         }}>
-          {player.username.slice(0, 10)}
+          {player.username.slice(0, 12)}
         </span>
         {/* Status badge */}
-        <span style={badgeStyle}>
+        <span style={{ ...badgeStyle, maxWidth: '82px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'center' }}>
           {isSelf ? 'YOU' : player.is_ready ? 'READY' : 'WAITING'}
         </span>
       </div>
@@ -134,7 +137,7 @@ function PlayerCard({
                 background: 'rgba(255,0,0,0.06)',
                 padding: '2px 10px',
                 cursor: 'pointer',
-                width: '80px',
+                width: '96px',
                 letterSpacing: '0.05em',
               }}
             >

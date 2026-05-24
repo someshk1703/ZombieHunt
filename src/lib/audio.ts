@@ -161,8 +161,60 @@ class AudioManager {
 
   setMuted(muted: boolean): void {
     this.muted = muted
-    if (muted) { this.stopMusic(200) }
+    if (muted) { this.stopMusic(200); this.stopAmbient() }
     this.saveToStorage()
+  }
+
+  // ── Procedural ambient (oscillator-based, no file needed) ─────────────────
+  private ambientNodes: Array<{ osc: OscillatorNode; lfo: OscillatorNode; gain: GainNode }> = []
+  private ambientMaster: GainNode | null = null
+
+  async playAmbient(type: 'lobby' | 'game'): Promise<void> {
+    await this.init()
+    if (this.muted || !this.ctx) return
+    this.stopAmbient()
+    const freqs = type === 'lobby' ? [40, 55, 73, 98] : [50, 75, 100, 133]
+    const master = this.ctx.createGain()
+    master.gain.value = 0
+    master.gain.linearRampToValueAtTime(
+      this.volumes.music * this.volumes.master * 0.12,
+      this.ctx.currentTime + 2
+    )
+    master.connect(this.ctx.destination)
+    this.ambientMaster = master
+
+    for (const freq of freqs) {
+      const osc = this.ctx.createOscillator()
+      const gain = this.ctx.createGain()
+      gain.gain.value = 0.25
+      osc.type = 'sine'
+      osc.frequency.value = freq
+      const lfo = this.ctx.createOscillator()
+      const lfoGain = this.ctx.createGain()
+      lfo.type = 'sine'
+      lfo.frequency.value = 0.05 + Math.random() * 0.15
+      lfoGain.gain.value = freq * 0.015
+      lfo.connect(lfoGain)
+      lfoGain.connect(osc.frequency)
+      osc.connect(gain)
+      gain.connect(master)
+      osc.start()
+      lfo.start()
+      this.ambientNodes.push({ osc, lfo, gain })
+    }
+  }
+
+  stopAmbient(): void {
+    if (!this.ambientMaster || !this.ctx) return
+    try {
+      this.ambientMaster.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 1)
+      const nodes = [...this.ambientNodes]
+      setTimeout(() => {
+        nodes.forEach(({ osc, lfo }) => { try { osc.stop(); lfo.stop() } catch { /* ignore */ } })
+      }, 1100)
+    } catch { /* ignore */ }
+    this.ambientNodes = []
+    this.ambientMaster = null
   }
 
   isMuted(): boolean { return this.muted }

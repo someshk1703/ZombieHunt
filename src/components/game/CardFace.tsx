@@ -14,10 +14,10 @@ const SUIT_SYMBOLS: Record<string, string> = {
 }
 
 const SUIT_COLORS: Record<string, string> = {
-  spades: 'var(--color-text)',
-  hearts: '#cc3333',
-  diamonds: '#cc3333',
-  clubs: 'var(--color-text)',
+  spades: '#d0d0d0',
+  hearts: '#e83030',
+  diamonds: '#e83030',
+  clubs: '#d0d0d0',
 }
 
 const SPECIAL_STYLES: Record<string, { border: string; shadow: string; color: string }> = {
@@ -52,9 +52,11 @@ export default function CardFace({ card, size = 'md', style }: CardFaceProps) {
   const cardStyle: React.CSSProperties = {
     width: dim.width,
     height: dim.height,
-    background: 'var(--color-surface)',
-    border: `1px solid ${specialStyle ? specialStyle.border : 'var(--color-border)'}`,
-    boxShadow: specialStyle ? `0 0 8px ${specialStyle.shadow}` : 'none',
+    background: 'linear-gradient(160deg, #242428 0%, #1a1a1d 100%)',
+    border: `1.5px solid ${specialStyle ? specialStyle.border : '#505055'}`,
+    boxShadow: specialStyle
+      ? `0 0 10px ${specialStyle.shadow}, 0 3px 10px rgba(0,0,0,0.8), inset 0 1px 0 rgba(255,255,255,0.09)`
+      : '0 3px 10px rgba(0,0,0,0.8), inset 0 1px 0 rgba(255,255,255,0.09)',
     position: 'relative',
     overflow: 'hidden',
     padding: dim.padding,

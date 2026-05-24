@@ -10,6 +10,14 @@ export function useAudio() {
     audioManager.playMusic(key, fadeMs)
   }, [])
 
+  const playAmbient = useCallback((type: 'lobby' | 'game') => {
+    audioManager.playAmbient(type)
+  }, [])
+
+  const stopAmbient = useCallback(() => {
+    audioManager.stopAmbient()
+  }, [])
+
   const stopMusic = useCallback((fadeMs?: number) => {
     audioManager.stopMusic(fadeMs)
   }, [])
@@ -24,5 +32,5 @@ export function useAudio() {
 
   const isMuted = useCallback(() => audioManager.isMuted(), [])
 
-  return { play, playMusic, stopMusic, setVolume, setMuted, isMuted }
+  return { play, playMusic, playAmbient, stopAmbient, stopMusic, setVolume, setMuted, isMuted }
 }

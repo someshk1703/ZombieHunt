@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useGameStore } from '../store/gameStore'
 import { supabase } from '../lib/supabase'
 import { useToast } from '../components/Toast'
+import { audioManager } from '../lib/audio'
 import AtmosphericBackground from '../components/AtmosphericBackground'
 import PlayerRing from '../components/PlayerRing'
 import LobbyChat from '../components/LobbyChat'
@@ -71,6 +72,14 @@ export default function WaitingRoom() {
   const readyCount = useMemo(() => players.filter(p => p.is_ready).length, [players])
   const allReady = readyCount === players.length && players.length >= 3
   const hostPlayer = useMemo(() => players.find(p => p.is_host), [players])
+
+  // Start lobby ambient on first user interaction
+  useEffect(() => {
+    const start = () => { audioManager.playAmbient('lobby'); document.removeEventListener('click', start); document.removeEventListener('touchstart', start) }
+    document.addEventListener('click', start, { once: true })
+    document.addEventListener('touchstart', start, { once: true })
+    return () => { audioManager.stopAmbient(); document.removeEventListener('click', start); document.removeEventListener('touchstart', start) }
+  }, [])
 
   // ── Initial data fetch ────────────────────────────────────────────────────
   useEffect(() => {
@@ -321,10 +330,13 @@ export default function WaitingRoom() {
 
       <div style={{ position: 'relative', zIndex: 1, maxWidth: '1200px', margin: '0 auto', padding: '24px' }}>
         {/* Room header */}
-        <div style={{
-          display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
-          paddingBottom: '16px', borderBottom: '1px solid var(--color-border)', marginBottom: '24px',
-        }}>
+        <div
+          className="waiting-room-header"
+          style={{
+            display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
+            paddingBottom: '16px', borderBottom: '1px solid var(--color-border)', marginBottom: '24px',
+          }}
+        >
           <div>
             <h1 style={{ fontFamily: "'Bebas Neue', cursive", fontSize: '32px', color: 'var(--color-text)', letterSpacing: '0.05em' }}>
               {room.settings.room_name ?? 'LOBBY'}
@@ -362,14 +374,17 @@ export default function WaitingRoom() {
         </div>
 
         {/* Three-column grid */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'clamp(220px, 25%, 280px) 1fr clamp(220px, 25%, 280px)',
-          gap: '24px',
-          alignItems: 'start',
-        }}>
+        <div
+          className="waiting-room-grid"
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'clamp(220px, 25%, 280px) 1fr clamp(220px, 25%, 280px)',
+            gap: '24px',
+            alignItems: 'start',
+          }}
+        >
           {/* Left — Chat */}
-          <div style={{ minHeight: '600px', display: 'flex', flexDirection: 'column' }}>
+          <div className="waiting-room-chat" style={{ minHeight: '600px', display: 'flex', flexDirection: 'column' }}>
             <LobbyChat roomId={room.id} initialMessages={initialChat} />
           </div>
 

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useGameStore } from '../store/gameStore'
 import { supabase } from '../lib/supabase'
+import { audioManager } from '../lib/audio'
 import { GameProvider, GameRoom, GamePlayer, GameState, useGame } from '../context/GameContext'
 import AtmosphericBackground from '../components/AtmosphericBackground'
 import DealingScreen from '../components/game/DealingScreen'
@@ -64,6 +65,11 @@ export default function Game() {
     if (!username) { navigate('/'); return }
     if (!code) { navigate('/'); return }
 
+    // Start game ambient on first interaction
+    const startAudio = () => audioManager.playAmbient('game')
+    document.addEventListener('click', startAudio, { once: true })
+    document.addEventListener('touchstart', startAudio, { once: true })
+
     async function init() {
       const upperCode = code!.toUpperCase()
 
@@ -94,6 +100,7 @@ export default function Game() {
     }
 
     init()
+    return () => { audioManager.stopAmbient() }
   }, [code, user, username, navigate])
 
   if (loading || !room || !gameState || !myPlayer) {

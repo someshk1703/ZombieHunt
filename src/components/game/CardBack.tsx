@@ -11,8 +11,9 @@ export default function CardBack({ width = 88, height = 120, style, className }:
       className={className}
       style={{
         width, height,
-        background: 'var(--color-surface)',
-        border: '1px solid var(--color-border)',
+        background: 'linear-gradient(160deg, #242428 0%, #1a1a1d 100%)',
+        border: '1.5px solid #505055',
+        boxShadow: '0 3px 10px rgba(0,0,0,0.8), inset 0 1px 0 rgba(255,255,255,0.07)',
         position: 'relative',
         overflow: 'hidden',
         display: 'flex',
