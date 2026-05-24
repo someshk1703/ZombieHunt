@@ -1,4 +1,4 @@
--- Migration: add generate_room_code() function
+-- Fix: rename local variable to avoid ambiguity with rooms.code column
 CREATE OR REPLACE FUNCTION generate_room_code()
 RETURNS TEXT
 LANGUAGE plpgsql
