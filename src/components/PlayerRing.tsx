@@ -36,7 +36,6 @@ function PlayerCard({
   onKick: (p: Player) => void
 }) {
   const [kickConfirm, setKickConfirm] = React.useState(false)
-  const [hovered, setHovered] = React.useState(false)
 
   const cardStyle: React.CSSProperties = {
     width: '80px',
@@ -86,8 +85,7 @@ function PlayerCard({
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
       <div
         style={cardStyle}
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => { setHovered(false); setKickConfirm(false) }}
+
       >
         {/* Crown for host */}
         {player.is_host && (
@@ -118,49 +116,51 @@ function PlayerCard({
         </span>
       </div>
 
-      {/* Host kick button */}
+      {/* Host kick button — always visible */}
       {isHostViewer && !isSelf && (
-        <AnimatePresence>
-          {hovered && !kickConfirm && (
+        <AnimatePresence mode="wait">
+          {!kickConfirm ? (
             <motion.button
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
+              key="kick-btn"
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.1 }}
               onClick={() => setKickConfirm(true)}
               style={{
                 fontFamily: "'IBM Plex Mono', monospace",
                 fontSize: '9px',
                 color: 'var(--color-red)',
                 border: '1px solid var(--color-red)',
-                background: 'transparent',
-                padding: '2px 8px',
+                background: 'rgba(255,0,0,0.06)',
+                padding: '2px 10px',
                 cursor: 'pointer',
+                width: '80px',
+                letterSpacing: '0.05em',
               }}
             >
-              KICK
+              ✕ KICK
             </motion.button>
-          )}
-          {hovered && kickConfirm && (
+          ) : (
             <motion.div
+              key="kick-confirm"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}
+              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', width: '80px' }}
             >
-              <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '9px', color: 'var(--color-text-muted)', textAlign: 'center', maxWidth: '80px' }}>
+              <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '8px', color: 'var(--color-text-muted)', textAlign: 'center' }}>
                 KICK {player.username.slice(0, 8).toUpperCase()}?
               </span>
               <div style={{ display: 'flex', gap: '4px' }}>
                 <button
-                  onClick={() => { onKick(player); setKickConfirm(false); setHovered(false) }}
-                  style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '9px', color: 'var(--color-red)', border: '1px solid var(--color-red)', background: 'transparent', padding: '1px 6px', cursor: 'pointer' }}
+                  onClick={() => { onKick(player); setKickConfirm(false) }}
+                  style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '9px', color: 'var(--color-red)', border: '1px solid var(--color-red)', background: 'rgba(255,0,0,0.1)', padding: '1px 8px', cursor: 'pointer' }}
                 >
                   YES
                 </button>
                 <button
                   onClick={() => setKickConfirm(false)}
-                  style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '9px', color: 'var(--color-text-muted)', border: '1px solid var(--color-border)', background: 'transparent', padding: '1px 6px', cursor: 'pointer' }}
+                  style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '9px', color: 'var(--color-text-muted)', border: '1px solid var(--color-border)', background: 'transparent', padding: '1px 8px', cursor: 'pointer' }}
                 >
                   NO
                 </button>
