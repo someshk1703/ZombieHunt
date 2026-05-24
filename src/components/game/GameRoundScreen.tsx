@@ -11,6 +11,7 @@ import HandPanel from './HandPanel'
 import DuelChat from './DuelChat'
 import InfectionAlert from './InfectionAlert'
 import { useToast } from '../Toast'
+import TimerDisplay from '../TimerDisplay'
 
 const MAX_SLOTS = 4
 
@@ -245,9 +246,12 @@ export default function GameRoundScreen() {
         <motion.span
           animate={timeLeft <= 5 ? { scale: [1, 1.05, 1] } : {}}
           transition={{ repeat: Infinity, duration: 0.6 }}
-          style={{ fontFamily: "'Bebas Neue', cursive", fontSize: '32px', color: timerColor }}
         >
-          {timerDisplay}
+          <TimerDisplay
+            deadline={deadline ?? null}
+            totalSeconds={isNegotiating ? 120 : 25}
+            size="md"
+          />
         </motion.span>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -274,9 +278,22 @@ export default function GameRoundScreen() {
         />
 
         {/* Battlefield: opponent + player zones */}
-        <div style={{ flex: 1, display: 'flex', transition: 'margin-left 200ms', marginLeft: chatOpen ? '260px' : '32px' }}>
-          {/* OPPONENT ZONE */}
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px', borderRight: '1px solid var(--color-border)' }}>
+          <div style={{ flex: 1, display: 'flex', transition: 'margin-left 200ms', marginLeft: chatOpen ? '260px' : '32px', position: 'relative' }}>
+            {/* Zone divider */}
+            <div style={{
+              position: 'absolute', top: 0, bottom: 0, left: '50%',
+              width: '1px',
+              background: 'linear-gradient(180deg, transparent 0%, rgba(204,0,0,0.3) 30%, rgba(204,0,0,0.3) 70%, transparent 100%)',
+              boxShadow: '0 0 16px rgba(204,0,0,0.15)',
+              pointerEvents: 'none', zIndex: 2,
+            }} />
+            {/* OPPONENT ZONE */}
+            <div style={{
+              flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px',
+              background: 'linear-gradient(160deg, rgba(28,10,10,0.7) 0%, rgba(18,8,8,0.5) 100%)',
+              border: '1px solid rgba(204,0,0,0.14)',
+              boxShadow: 'inset 0 0 40px rgba(0,0,0,0.3)',
+            }}>
             {opponent ? (
               <>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
@@ -339,7 +356,12 @@ export default function GameRoundScreen() {
           </div>
 
           {/* PLAYER ZONE (YOU) */}
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+            <div style={{
+              flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px',
+              background: 'linear-gradient(200deg, rgba(10,20,10,0.7) 0%, rgba(8,16,8,0.5) 100%)',
+              border: '1px solid rgba(0,255,65,0.1)',
+              boxShadow: 'inset 0 0 40px rgba(0,0,0,0.3)',
+            }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
               <img src={myPlayer.avatar_url} alt="You" style={{ width: '48px', height: '48px', borderRadius: '50%', border: '2px solid var(--color-red)' }} />
               <div>

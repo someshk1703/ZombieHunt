@@ -315,7 +315,15 @@ export default function WaitingRoom() {
 
   // ── Layout ────────────────────────────────────────────────────────────────
   return (
-    <div style={{ position: 'relative', minHeight: '100vh', background: 'var(--color-bg)' }}>
+    <div style={{
+      position: 'relative', minHeight: '100vh',
+      background: `
+        radial-gradient(ellipse 80% 50% at 50% 0%, rgba(80,0,0,0.2) 0%, transparent 70%),
+        radial-gradient(ellipse 50% 40% at 90% 100%, rgba(0,40,0,0.12) 0%, transparent 60%),
+        radial-gradient(ellipse 40% 30% at 10% 50%, rgba(0,0,40,0.1) 0%, transparent 60%),
+        #0a0a0a
+      `,
+    }}>
       <AtmosphericBackground />
 
       {isHost && room.status === 'lobby' && (
@@ -328,7 +336,7 @@ export default function WaitingRoom() {
         />
       )}
 
-      <div style={{ position: 'relative', zIndex: 1, maxWidth: '1200px', margin: '0 auto', padding: '24px' }}>
+      <div style={{ position: 'relative', zIndex: 1, maxWidth: '1200px', margin: '0 auto', padding: '24px' }} className="waiting-room-layout">
         {/* Room header */}
         <div
           className="waiting-room-header"
@@ -384,12 +392,15 @@ export default function WaitingRoom() {
           }}
         >
           {/* Left — Chat */}
-          <div className="waiting-room-chat" style={{ minHeight: '600px', display: 'flex', flexDirection: 'column' }}>
+          <div className="waiting-room-chat" style={{ minHeight: '600px', display: 'flex', flexDirection: 'column', background: 'var(--color-surface-grey)', borderRight: '1px solid rgba(255,255,255,0.06)' }}>
             <LobbyChat roomId={room.id} initialMessages={initialChat} />
           </div>
 
           {/* Center — Player ring */}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '24px' }}>
+          <div className="player-ring-container" style={{
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '24px',
+            background: 'radial-gradient(ellipse 65% 65% at center, rgba(30,0,0,0.25) 0%, transparent 70%)',
+          }}>
             <PlayerRing
               players={players}
               maxPlayers={room.settings.max_players}
@@ -405,7 +416,7 @@ export default function WaitingRoom() {
           </div>
 
           {/* Right — Room info */}
-          <div>
+          <div className="room-info-panel" style={{ background: 'linear-gradient(180deg, rgba(16,14,20,0.97) 0%, rgba(14,14,18,0.97) 100%)', borderLeft: '1px solid rgba(255,255,255,0.05)', padding: '16px' }}>
             <RoomInfo
               roomCode={room.code}
               settings={room.settings}

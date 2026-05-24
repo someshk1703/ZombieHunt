@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useMediaQuery } from '../hooks/useMediaQuery'
 
 interface Player {
   id: string
@@ -38,18 +39,12 @@ function PlayerCard({
   const [kickConfirm, setKickConfirm] = React.useState(false)
 
   const cardStyle: React.CSSProperties = {
-    width: '96px',
-    height: '118px',
-    background: 'linear-gradient(160deg, #1c1c1e 0%, #141416 100%)',
-    border: `1.5px solid ${isSelf ? 'var(--color-red)' : '#3a3a3a'}`,
-    boxShadow: isSelf
-      ? '0 0 10px var(--color-red-glow), 0 4px 16px rgba(0,0,0,0.8)'
-      : '0 4px 16px rgba(0,0,0,0.8), inset 0 1px 0 rgba(255,255,255,0.05)',
-    padding: '8px 6px 6px',
+    width: '140px',
+    height: '170px',
+    padding: '14px',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    gap: '4px',
     cursor: 'default',
     position: 'relative',
     flexShrink: 0,
@@ -58,22 +53,34 @@ function PlayerCard({
   if (!player) {
     return (
       <div style={{
-        ...cardStyle,
+        width: '140px',
+        height: '170px',
         border: '1.5px dashed rgba(58,58,58,0.4)',
         background: 'rgba(20,20,22,0.4)',
+        display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
       }}>
-        <span style={{ color: 'var(--color-text-muted)', opacity: 0.3, fontSize: '20px' }}>+</span>
+        <span style={{ color: 'var(--color-text-muted)', opacity: 0.3, fontSize: '24px' }}>+</span>
       </div>
     )
   }
 
   let badgeStyle: React.CSSProperties = {
-    fontSize: '8px',
-    padding: '2px 6px',
+    fontSize: '10px',
+    padding: '4px 8px',
     fontFamily: "'IBM Plex Mono', monospace",
     letterSpacing: '0.05em',
+    marginTop: '8px',
+    whiteSpace: 'nowrap',
+    display: 'block',
+    textAlign: 'center',
+    width: 'fit-content',
+    marginLeft: 'auto',
+    marginRight: 'auto',
+    maxWidth: '112px',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
   }
   if (isSelf) {
     badgeStyle = { ...badgeStyle, border: '1px solid var(--color-red)', color: 'var(--color-red)' }
@@ -87,34 +94,35 @@ function PlayerCard({
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
       <div
         style={cardStyle}
-
+        className={`player-card${isSelf ? ' player-card--self' : ''}${player.is_host ? ' player-card--host' : ''}`}
       >
         {/* Crown for host */}
         {player.is_host && (
-          <span style={{ position: 'absolute', top: '2px', right: '2px', fontSize: '10px' }}>👑</span>
+          <span style={{ position: 'absolute', top: '-6px', right: '-6px', fontSize: '14px' }}>👑</span>
         )}
         {/* Avatar */}
         <img
           src={player.avatar_url}
           alt={player.username}
-          style={{ width: '40px', height: '40px', border: '1px solid #3a3a3a', background: '#0a0a0a', flexShrink: 0 }}
+          style={{ width: '64px', height: '64px', margin: '0 auto 8px auto', border: '1px solid #3a3a3a', background: '#0a0a0a', flexShrink: 0, display: 'block' }}
         />
         {/* Username */}
-        <span style={{
+        <span className="player-username" style={{
           fontFamily: "'IBM Plex Mono', monospace",
-          fontSize: '9px',
+          fontSize: '12px',
           color: 'var(--color-text)',
-          width: '80px',
+          maxWidth: '112px',
           overflow: 'hidden',
           textOverflow: 'ellipsis',
           whiteSpace: 'nowrap',
           textAlign: 'center',
-          lineHeight: 1.2,
+          marginTop: '6px',
+          display: 'block',
         }}>
-          {player.username.slice(0, 12)}
+          {player.username}
         </span>
         {/* Status badge */}
-        <span style={{ ...badgeStyle, maxWidth: '82px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'center' }}>
+        <span style={badgeStyle}>
           {isSelf ? 'YOU' : player.is_ready ? 'READY' : 'WAITING'}
         </span>
       </div>
@@ -137,7 +145,8 @@ function PlayerCard({
                 background: 'rgba(255,0,0,0.06)',
                 padding: '2px 10px',
                 cursor: 'pointer',
-                width: '96px',
+                width: '140px',
+                marginTop: '10px',
                 letterSpacing: '0.05em',
               }}
             >
@@ -197,8 +206,14 @@ export default function PlayerRing({
   const myPlayer = players.find(p => p.user_id === currentUserId)
   const allReady = readyCount === players.length && players.length >= 3
 
-  const ringSize = 'clamp(320px, 45vw, 560px)'
-  const radius = 'clamp(130px, 18vw, 230px)'
+  const isMobilePortrait = useMediaQuery('(max-width: 767px) and (orientation: portrait)')
+  const ringRadius = isMobilePortrait
+    ? Math.max(110, Math.min(150, players.length * 18))
+    : Math.max(180, players.length * 26)
+
+  const ringSize = isMobilePortrait ? `${ringRadius * 2 + 160}px` : 'clamp(320px, 45vw, 560px)'
+  const radius = `${ringRadius}px`
+  const centerTitleSize = isMobilePortrait ? '14px' : '20px'
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '24px' }}>
@@ -248,7 +263,7 @@ export default function PlayerRing({
             </div>
           ) : (
             <>
-              <span style={{ fontFamily: "'Bebas Neue', cursive", fontSize: '20px', color: 'var(--color-red)', letterSpacing: '0.05em' }}>
+              <span style={{ fontFamily: "'Bebas Neue', cursive", fontSize: centerTitleSize, color: 'var(--color-red)', letterSpacing: '0.05em' }}>
                 ZOMBIE HUNT
               </span>
               <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '4px' }}>

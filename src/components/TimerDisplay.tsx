@@ -1,38 +1,68 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { getAdjustedNow } from '../lib/supabase'
 
 interface TimerDisplayProps {
-  deadline: string
+  deadline: string | null
+  totalSeconds?: number
   size?: 'sm' | 'md' | 'lg'
+  onExpire?: () => void
 }
 
-const sizes = { sm: '18px', md: '28px', lg: '48px' }
-
-export default function TimerDisplay({ deadline, size = 'md' }: TimerDisplayProps) {
-  const [remaining, setRemaining] = useState<number>(() =>
-    Math.max(0, Math.floor((new Date(deadline).getTime() - Date.now()) / 1000))
-  )
+export default function TimerDisplay({
+  deadline,
+  totalSeconds = 30,
+  size = 'md',
+  onExpire,
+}: TimerDisplayProps) {
+  const [remainingMs, setRemainingMs] = useState(0)
+  const expiredRef = useRef(false)
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      const r = Math.max(0, Math.floor((new Date(deadline).getTime() - Date.now()) / 1000))
-      setRemaining(r)
-    }, 100)
+    if (!deadline) return
+    expiredRef.current = false
+
+    const tick = () => {
+      const deadlineMs = new Date(deadline).getTime()
+      if (isNaN(deadlineMs)) {
+        console.error('Invalid deadline:', deadline)
+        return
+      }
+      const remaining = Math.max(0, deadlineMs - getAdjustedNow())
+      setRemainingMs(remaining)
+
+      if (remaining <= 0 && !expiredRef.current) {
+        expiredRef.current = true
+        onExpire?.()
+      }
+    }
+
+    tick()
+    const interval = setInterval(tick, 100)
     return () => clearInterval(interval)
-  }, [deadline])
+  }, [deadline, onExpire])
 
-  if (remaining === 0) return null
+  const seconds = Math.ceil(remainingMs / 1000)
+  const minutes = Math.floor(seconds / 60)
+  const secs = seconds % 60
 
-  const color = remaining > 10 ? 'var(--color-text)' : remaining > 5 ? 'var(--color-warning)' : 'var(--color-red)'
-  const display = remaining > 60
-    ? `${String(Math.floor(remaining / 60)).padStart(2, '0')}:${String(remaining % 60).padStart(2, '0')}`
-    : String(remaining)
+  const display = totalSeconds > 60
+    ? `${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
+    : String(Math.max(0, seconds))
+
+  const color = remainingMs > 10000
+    ? 'var(--color-text)'
+    : remainingMs > 5000
+      ? 'var(--color-warning)'
+      : 'var(--color-red)'
+
+  const fontSize = { sm: '18px', md: '32px', lg: '48px' }[size]
 
   return (
     <span style={{
-      fontFamily: "'Bebas Neue', cursive",
-      fontSize: sizes[size],
+      fontFamily: "'Bebas Neue', sans-serif",
+      fontSize,
       color,
-      animation: remaining <= 5 ? 'pulse 0.6s infinite' : undefined,
+      animation: remainingMs <= 5000 && remainingMs > 0 ? 'pulse 0.5s ease infinite alternate' : 'none',
     }}>
       {display}
     </span>

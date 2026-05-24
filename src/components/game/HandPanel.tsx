@@ -41,7 +41,9 @@ function DraggableCard({
 
   return (
     <div ref={setNodeRef} style={style} {...listeners} {...attributes} onClick={!isDragging ? onClick : undefined}>
-      <CardFace card={card} size="sm" />
+      <div style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.8))' }}>
+        <CardFace card={card} size="sm" />
+      </div>
       {inZone && (
         <div style={{
           position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -101,7 +103,7 @@ export default function HandPanel({ playZoneCardIds, onAddToZone, onRemoveFromZo
           />
         ))}
         {usedCards.map(card => (
-          <div key={card.id} style={{ position: 'relative', flexShrink: 0, opacity: 0.3 }}>
+          <div key={card.id} style={{ position: 'relative', flexShrink: 0, opacity: 0.3, filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.8))' }}>
             <CardFace card={card} size="sm" />
             <div style={{
               position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',

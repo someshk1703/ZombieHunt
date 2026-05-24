@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-route
 import { useEffect } from 'react'
 import { useAuth } from './lib/auth'
 import { useGameStore } from './store/gameStore'
+import { syncServerTime } from './lib/supabase'
 import { ToastProvider } from './components/Toast'
 import AtmosphericBackground from './components/AtmosphericBackground'
 import LoadingScreen from './components/LoadingScreen'
@@ -44,6 +45,12 @@ export default function App() {
   useEffect(() => {
     if (user) setUser({ id: user.id })
   }, [user, setUser])
+
+  useEffect(() => {
+    syncServerTime()
+    const interval = setInterval(syncServerTime, 5 * 60 * 1000)
+    return () => clearInterval(interval)
+  }, [])
 
   return (
     <BrowserRouter>

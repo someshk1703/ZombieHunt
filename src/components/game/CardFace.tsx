@@ -14,16 +14,16 @@ const SUIT_SYMBOLS: Record<string, string> = {
 }
 
 const SUIT_COLORS: Record<string, string> = {
-  spades: '#d0d0d0',
-  hearts: '#e83030',
-  diamonds: '#e83030',
-  clubs: '#d0d0d0',
+  spades: 'var(--card-text)',
+  hearts: 'var(--card-red)',
+  diamonds: 'var(--card-red)',
+  clubs: 'var(--card-text)',
 }
 
 const SPECIAL_STYLES: Record<string, { border: string; shadow: string; color: string }> = {
-  zombie:  { border: 'var(--color-green)',  shadow: 'rgba(0,255,65,0.2)',   color: 'var(--color-green)' },
-  shotgun: { border: 'var(--color-warning)', shadow: 'rgba(255,107,0,0.2)', color: 'var(--color-warning)' },
-  vaccine: { border: '#4499ff',              shadow: 'rgba(68,153,255,0.2)', color: '#4499ff' },
+  zombie:  { border: 'rgba(0,255,65,0.5)',    shadow: 'rgba(0,255,65,0.25)',    color: 'var(--color-green)' },
+  shotgun: { border: 'rgba(255,107,0,0.5)',   shadow: 'rgba(255,107,0,0.25)',   color: 'var(--color-warning)' },
+  vaccine: { border: 'rgba(68,153,255,0.5)',  shadow: 'rgba(68,153,255,0.25)', color: '#4499ff' },
 }
 
 function valueLabel(value: number): string {
@@ -52,11 +52,11 @@ export default function CardFace({ card, size = 'md', style }: CardFaceProps) {
   const cardStyle: React.CSSProperties = {
     width: dim.width,
     height: dim.height,
-    background: 'linear-gradient(160deg, #242428 0%, #1a1a1d 100%)',
-    border: `1.5px solid ${specialStyle ? specialStyle.border : '#505055'}`,
+    background: 'var(--card-bg)',
+    border: `1px solid ${specialStyle ? specialStyle.border : 'var(--card-border)'}`,
     boxShadow: specialStyle
-      ? `0 0 10px ${specialStyle.shadow}, 0 3px 10px rgba(0,0,0,0.8), inset 0 1px 0 rgba(255,255,255,0.09)`
-      : '0 3px 10px rgba(0,0,0,0.8), inset 0 1px 0 rgba(255,255,255,0.09)',
+      ? `0 0 20px ${specialStyle.shadow}, 0 6px 20px var(--card-shadow), 0 2px 0 rgba(0,0,0,0.15)`
+      : `0 2px 0 rgba(0,0,0,0.15), 0 6px 20px var(--card-shadow)`,
     position: 'relative',
     overflow: 'hidden',
     padding: dim.padding,
@@ -85,7 +85,7 @@ export default function CardFace({ card, size = 'md', style }: CardFaceProps) {
         <>
           {/* Top-left corner */}
           <div style={{ position: 'absolute', top: dim.padding, left: dim.padding, lineHeight: 1 }}>
-            <div style={{ fontFamily: "'Bebas Neue', cursive", fontSize: dim.valueFont, color: 'var(--color-text)', lineHeight: 1 }}>
+            <div style={{ fontFamily: "'Bebas Neue', cursive", fontSize: dim.valueFont, color: suitColor, lineHeight: 1 }}>
               {valueLabel(card.value)}
             </div>
             <div style={{ fontSize: dim.suitCorner, color: suitColor }}>
@@ -107,13 +107,15 @@ export default function CardFace({ card, size = 'md', style }: CardFaceProps) {
             position: 'absolute', bottom: dim.padding, right: dim.padding,
             transform: 'rotate(180deg)', lineHeight: 1,
           }}>
-            <div style={{ fontFamily: "'Bebas Neue', cursive", fontSize: dim.valueFont, color: 'var(--color-text)', lineHeight: 1 }}>
+            <div style={{ fontFamily: "'Bebas Neue', cursive", fontSize: dim.valueFont, color: suitColor, lineHeight: 1 }}>
               {valueLabel(card.value)}
             </div>
             <div style={{ fontSize: dim.suitCorner, color: suitColor }}>
               {suitSymbol}
             </div>
           </div>
+          {/* Inner frame */}
+          <div style={{ position: 'absolute', inset: '3px', border: '0.5px solid var(--card-border-inner)', pointerEvents: 'none' }} />
         </>
       ) : (
         /* Special card layout */
@@ -123,6 +125,7 @@ export default function CardFace({ card, size = 'md', style }: CardFaceProps) {
             <div style={{
               position: 'absolute', inset: 0,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: '#0a0a0a',
             }}>
               <span style={{
                 fontFamily: "'Bebas Neue', cursive",
@@ -133,31 +136,37 @@ export default function CardFace({ card, size = 'md', style }: CardFaceProps) {
               </span>
             </div>
           ) : (
-            <img
-              src={`/assets/cards/${card.type}.png`}
-              alt={card.type}
-              onError={() => setImgError(true)}
-              style={{
-                position: 'absolute',
-                top: dim.padding, left: dim.padding,
-                right: dim.padding,
-                bottom: dim.typeFont + 8 + dim.padding,
-                width: `calc(100% - ${dim.padding * 2}px)`,
-                height: `calc(100% - ${dim.typeFont + 8 + dim.padding * 2}px)`,
-                objectFit: 'cover',
-              }}
-            />
+            <>
+              {/* Dark art background */}
+              <div style={{
+                position: 'absolute', inset: '6px',
+                background: '#0a0a0a', overflow: 'hidden',
+              }}>
+                <img
+                  src={`/assets/cards/${card.type}.png`}
+                  alt={card.type}
+                  onError={() => setImgError(true)}
+                  style={{
+                    width: '100%',
+                    height: `calc(100% - ${dim.typeFont + 4}px)`,
+                    objectFit: 'cover',
+                    objectPosition: 'center top',
+                    display: 'block',
+                  }}
+                />
+              </div>
+            </>
           )}
 
           {/* Type label at bottom */}
           <div style={{
-            position: 'absolute', bottom: 0, left: 0, right: 0,
+            position: 'absolute', bottom: 6, left: 6, right: 6,
             fontFamily: "'Bebas Neue', cursive",
             fontSize: dim.typeFont,
             color: specialStyle!.color,
-            background: 'rgba(0,0,0,0.7)',
+            background: 'rgba(0,0,0,0.9)',
             textAlign: 'center',
-            padding: '4px',
+            padding: '4px 0',
             letterSpacing: '0.05em',
           }}>
             {card.type.toUpperCase()}

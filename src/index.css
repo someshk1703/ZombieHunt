@@ -9,8 +9,8 @@
 /* ── CSS Variables ──────────────────────────────────────────── */
 :root {
   --color-bg:         #080808;
-  --color-surface:    #161618;
-  --color-surface-2:  #1e1e22;
+  --color-surface:    #141414;
+  --color-surface-2:  #1e1e1e;
   --color-border:     #303033;
   --color-red:        #cc0000;
   --color-red-glow:   #ff000033;
@@ -18,6 +18,29 @@
   --color-text:       #e8e8e8;
   --color-text-muted: #666666;
   --color-warning:    #ff6b00;
+
+  /* Surface contrast */
+  --color-surface-red:   rgba(28,8,8,0.92);
+  --color-surface-green: rgba(8,18,8,0.92);
+  --color-surface-grey:  rgba(28,28,32,0.95);
+  --color-surface-glow:  rgba(204,0,0,0.05);
+
+  /* Zone borders */
+  --color-zone-red:     rgba(204,0,0,0.15);
+  --color-zone-green:   rgba(0,255,65,0.08);
+  --color-zone-neutral: rgba(255,255,255,0.04);
+
+  /* Card colors — cold white theme */
+  --card-bg:           #F0F0F0;
+  --card-bg-alt:       #E8E8E8;
+  --card-bg-hover:     #EBEBEB;
+  --card-border:       #C8C8C8;
+  --card-border-inner: rgba(0,0,0,0.08);
+  --card-shadow:       rgba(0,0,0,0.65);
+  --card-text:         #0a0a0a;
+  --card-text-muted:   #444444;
+  --card-red:          #990000;
+  --card-shine:        rgba(255,255,255,0.6);
 }
 
 /* ── Base Reset ─────────────────────────────────────────────── */
@@ -112,6 +135,36 @@ body {
 .btn-secondary:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+/* ── Player Cards ───────────────────────────────────────────── */
+.player-card {
+  background: linear-gradient(145deg, #1c1c1c 0%, #161616 60%, #1a1010 100%);
+  border: 1px solid #2e2e2e;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.05),
+    inset 0 -1px 0 rgba(0,0,0,0.3),
+    0 6px 16px rgba(0,0,0,0.6);
+}
+
+.player-card.player-card--infected {
+  background: linear-gradient(145deg, #0a1a0a 0%, #0e160e 60%, #0a200a 100%);
+  border: 1px solid rgba(0,255,65,0.35);
+  box-shadow: 0 0 20px rgba(0,255,65,0.12), 0 6px 16px rgba(0,0,0,0.6);
+}
+
+.player-card.player-card--self {
+  background: linear-gradient(145deg, #1c0a0a 0%, #160d0d 60%, #200a0a 100%);
+  border: 1px solid rgba(204,0,0,0.45);
+  box-shadow: 0 0 20px rgba(204,0,0,0.18), 0 6px 16px rgba(0,0,0,0.6);
+}
+
+.player-card.player-card--host {
+  border-top: 2px solid var(--color-warning);
+}
+
+.player-card .player-username {
+  text-shadow: 0 1px 4px rgba(0,0,0,0.9);
 }
 
 /* ── Input ──────────────────────────────────────────────────── */
