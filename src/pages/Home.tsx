@@ -5,12 +5,14 @@ import { useGameStore } from '../store/gameStore'
 import { supabase } from '../lib/supabase'
 import UsernameModal from '../components/UsernameModal'
 import JoinRoomModal from '../components/JoinRoomModal'
+import RulesModal from '../components/RulesModal'
 
 export default function Home() {
   const { username, pendingRoomCode, setPendingRoomCode } = useGameStore()
   const navigate = useNavigate()
   const [survivorsOnline, setSurvivorsOnline] = useState<number>(0)
   const [joinModalOpen, setJoinModalOpen] = useState(false)
+  const [rulesOpen, setRulesOpen] = useState(false)
 
   // Auto-open join modal if there's a pending room code after username set
   useEffect(() => {
@@ -69,7 +71,7 @@ export default function Home() {
             ZOMBIE HUNT
           </h1>
           <p style={{ fontSize: '11px', color: 'var(--color-text-muted)', letterSpacing: '0.3em', marginTop: '6px', textTransform: 'uppercase' }}>
-            Alice in Borderland — Season 3
+            MULTIPLAYER SURVIVAL CARD GAME
           </p>
         </div>
 
@@ -119,6 +121,22 @@ export default function Home() {
           >
             Quick Play →
           </button>
+
+          <button
+            style={{
+              background: 'none', border: 'none',
+              color: 'var(--color-text-muted)',
+              fontFamily: "'IBM Plex Mono', monospace",
+              fontSize: '11px', letterSpacing: '0.15em',
+              cursor: 'pointer', padding: '4px 0',
+              transition: 'color 150ms ease',
+            }}
+            onClick={() => setRulesOpen(true)}
+            onMouseEnter={e => { (e.target as HTMLElement).style.color = 'var(--color-text)' }}
+            onMouseLeave={e => { (e.target as HTMLElement).style.color = 'var(--color-text-muted)' }}
+          >
+            ? HOW TO PLAY
+          </button>
         </div>
 
         {/* Survivors Online */}
@@ -126,6 +144,9 @@ export default function Home() {
           ▸ {survivorsOnline} SURVIVORS ONLINE
         </p>
       </motion.div>
+
+      {/* Rules Modal */}
+      {rulesOpen && <RulesModal onClose={() => setRulesOpen(false)} />}
 
       {/* Join Room Modal */}
       {joinModalOpen && (

@@ -16,8 +16,14 @@ export function useAuth(): AuthState {
   })
 
   useEffect(() => {
+    // Safety timeout — never leave loading stuck
+    const timeout = setTimeout(() => {
+      setState(prev => prev.loading ? { ...prev, loading: false } : prev)
+    }, 5000)
+
     // Check existing session on mount
     supabase.auth.getSession().then(async ({ data: { session } }) => {
+      clearTimeout(timeout)
       if (session) {
         setState({ user: session.user, session, loading: false })
       } else {
@@ -26,6 +32,9 @@ export function useAuth(): AuthState {
         const { data: { session: newSession } } = await supabase.auth.getSession()
         setState({ user, session: newSession, loading: false })
       }
+    }).catch(() => {
+      clearTimeout(timeout)
+      setState({ user: null, session: null, loading: false })
     })
 
     // Listen for auth state changes
