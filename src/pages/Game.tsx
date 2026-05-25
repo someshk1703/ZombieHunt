@@ -13,6 +13,7 @@ import EliminationCheckScreen from '../components/game/EliminationCheckScreen'
 import WinRevealScreen from '../components/game/WinRevealScreen'
 import GhostOverlay from '../components/game/GhostOverlay'
 import DeathScreen from '../components/game/DeathScreen'
+import DiscussionRoundScreen from '../components/game/DiscussionRoundScreen'
 
 function GamePhaseRouter() {
   const { gameState, myPlayer, isGhost } = useGame()
@@ -43,6 +44,7 @@ function GamePhaseRouter() {
           {gameState.phase === 'blind_action' && <GameRoundScreen />}
           {gameState.phase === 'reveal' && <RevealScreen />}
           {gameState.phase === 'elimination_check' && <EliminationCheckScreen />}
+          {gameState.phase === 'discussion' && <DiscussionRoundScreen />}
           {gameState.phase === 'finished' && <WinRevealScreen />}
         </>
       )}

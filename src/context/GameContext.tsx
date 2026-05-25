@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useGameStore, Card } from '../store/gameStore'
 
-export type GamePhase = 'deal' | 'hand_review' | 'blind_action' | 'reveal' | 'elimination_check' | 'finished'
+export type GamePhase = 'deal' | 'hand_review' | 'blind_action' | 'reveal' | 'elimination_check' | 'discussion' | 'finished'
 
 export interface GamePlayer {
   id: string

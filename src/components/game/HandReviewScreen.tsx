@@ -160,6 +160,9 @@ export default function HandReviewScreen() {
     : 0
 
   const otherPlayers = players.filter(p => p.user_id !== myPlayer.user_id)
+  const activePlayers = players.filter(p => p.status !== 'eliminated')
+  const totalHumans = activePlayers.filter(p => p.status === 'alive').length
+  const totalZombies = activePlayers.filter(p => p.status === 'infected').length
 
   return (
     <div style={{
@@ -254,6 +257,41 @@ export default function HandReviewScreen() {
         <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '11px', color: 'var(--color-text-muted)', textAlign: 'center', marginTop: '8px' }}>
           Your hand is set. Waiting for the game to begin.
         </p>
+
+        {/* TOTAL HUMANS / TOTAL ZOMBIES footer — matches Display Card screen diagram */}
+        <div style={{
+          display: 'flex', gap: '40px', marginTop: '16px',
+          paddingTop: '16px', borderTop: '1px solid var(--color-border)',
+        }}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{
+              fontFamily: "'Bebas Neue', cursive", fontSize: '28px',
+              color: '#4499ff', letterSpacing: '0.05em', lineHeight: 1,
+            }}>
+              {totalHumans}
+            </div>
+            <div style={{
+              fontFamily: "'IBM Plex Mono', monospace", fontSize: '10px',
+              color: 'var(--color-text-muted)', letterSpacing: '0.2em', marginTop: '4px',
+            }}>
+              TOTAL HUMANS
+            </div>
+          </div>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{
+              fontFamily: "'Bebas Neue', cursive", fontSize: '28px',
+              color: 'var(--color-green)', letterSpacing: '0.05em', lineHeight: 1,
+            }}>
+              {totalZombies}
+            </div>
+            <div style={{
+              fontFamily: "'IBM Plex Mono', monospace", fontSize: '10px',
+              color: 'var(--color-text-muted)', letterSpacing: '0.2em', marginTop: '4px',
+            }}>
+              TOTAL ZOMBIES
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   )

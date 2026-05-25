@@ -234,19 +234,18 @@ Deno.serve(async (req: Request) => {
       if (sz) finalPairs.push([bye, sz.id])
     }
 
-    const negTimer = room.settings?.negotiation_timer_seconds ?? 60
-    const negotiationDeadline = new Date(Date.now() + negTimer * 1000).toISOString()
-    const phaseDeadline = new Date(Date.now() + negTimer * 1000 + 25000).toISOString()
-
+    // Transition to discussion phase so players can review outcomes before the next duel.
+    // The host (via DiscussionRoundScreen) will advance to blind_action and set deadlines.
     await supabase.from('game_state').update({
       round_number: round_number + 1,
-      phase: 'blind_action',
+      phase: 'discussion',
       pairs: finalPairs,
       bye_player_id: null,
       committed_cards: {},
-      negotiation_deadline: negotiationDeadline,
-      phase_deadline: phaseDeadline,
-      updated_at: new Date().toISOString()
+      negotiation_deadline: null,
+      phase_deadline: null,
+      discussion_started_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     }).eq('room_id', room_id)
   } else {
     // Trigger win check — set elimination_check phase

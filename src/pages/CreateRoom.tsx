@@ -83,6 +83,7 @@ export default function CreateRoom() {
   const [allowSpectators, setAllowSpectators] = useState(true)
   const [infectionVisibility, setInfectionVisibility] = useState(false)
   const [visibility, setVisibility] = useState<'public' | 'private'>('public')
+  const [totalRounds, setTotalRounds] = useState<number>(10)
   const [loading, setLoading] = useState(false)
   const [createdCode, setCreatedCode] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
@@ -109,7 +110,7 @@ export default function CreateRoom() {
       const { data: room, error: roomErr } = await supabase
         .from('rooms').insert({
           host_id: user!.id, code, status: 'lobby',
-          settings: { room_name: roomName.trim(), max_players: maxPlayers, round_timer_seconds: timer, allow_spectators: allowSpectators, infection_visibility: infectionVisibility, visibility, max_lives: 1 },
+          settings: { room_name: roomName.trim(), max_players: maxPlayers, round_timer_seconds: timer, allow_spectators: allowSpectators, infection_visibility: infectionVisibility, visibility, max_lives: 1, total_rounds: totalRounds },
         }).select().single()
       if (roomErr) throw roomErr
 
@@ -177,6 +178,10 @@ export default function CreateRoom() {
               <ToggleSwitch value={infectionVisibility} onChange={setInfectionVisibility} />
             </SettingRow>
 
+            <SettingRow label="Total Rounds" sub="Game ends after this many rounds">
+              <SegmentedControl options={[{ label: '5', value: 5 }, { label: '10', value: 10 }, { label: '15', value: 15 }, { label: '20', value: 20 }]} value={totalRounds} onChange={v => setTotalRounds(v as number)} />
+            </SettingRow>
+
             <div>
               <p style={{ fontSize: '10px', color: 'var(--color-text-muted)', letterSpacing: '0.2em', textTransform: 'uppercase', marginBottom: '8px' }}>Visibility</p>
               <SegmentedControl options={[{ label: 'Public', value: 'public' }, { label: 'Private', value: 'private' }]} value={visibility} onChange={v => setVisibility(v as 'public' | 'private')} />
@@ -199,7 +204,7 @@ export default function CreateRoom() {
             </div>
 
             <div style={{ marginBottom: '24px' }}>
-              {([['Players', `Up to ${maxPlayers}`], ['Timer', `${timer}s per round`], ['Ghost Mode', allowSpectators ? 'Enabled' : 'Disabled'], ['Infection', infectionVisibility ? 'Reveals after 2 rounds' : 'Secret'], ['Visibility', visibility === 'public' ? 'Public' : 'Private']] as [string, string][]).map(([label, value], i, arr) => (
+              {([['Players', `Up to ${maxPlayers}`], ['Timer', `${timer}s per round`], ['Total Rounds', String(totalRounds)], ['Ghost Mode', allowSpectators ? 'Enabled' : 'Disabled'], ['Infection', infectionVisibility ? 'Reveals after 2 rounds' : 'Secret'], ['Visibility', visibility === 'public' ? 'Public' : 'Private']] as [string, string][]).map(([label, value], i, arr) => (
                 <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: i < arr.length - 1 ? '1px dashed var(--color-border)' : 'none' }}>
                   <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontFamily: "'IBM Plex Mono', monospace" }}>{label}</span>
                   <span style={{ fontSize: '11px', color: 'var(--color-text)', fontFamily: "'IBM Plex Mono', monospace" }}>{value}</span>
