@@ -39,16 +39,6 @@ interface PlayerStats {
   special_cards_played: number
 }
 
-interface GameEvent {
-  id: string
-  round_number: number
-  event_type: string
-  actor_username: string | null
-  target_username: string | null
-  metadata: Record<string, unknown>
-  created_at: string
-}
-
 interface GameStateResult {
   round_number: number
   winner_faction: 'humans' | 'zombies' | null
@@ -56,30 +46,6 @@ interface GameStateResult {
 }
 
 type Tab = 'scoreboard' | 'story'
-
-function formatEvent(ev: GameEvent): string {
-  switch (ev.event_type) {
-    case 'infection': return `${ev.actor_username} infected ${ev.target_username}`
-    case 'elimination': return `${ev.target_username} was eliminated by ${ev.actor_username}`
-    case 'vaccine_used': return `${ev.actor_username} used a vaccine`
-    case 'shotgun_fired': return `${ev.actor_username} fired a shotgun at ${ev.target_username}`
-    case 'card_stolen': return `${ev.actor_username} stole a card from ${ev.target_username}`
-    case 'zombie_played': return `${ev.actor_username} played a zombie card`
-    case 'game_start': return 'The hunt began'
-    case 'game_end': return 'The game ended'
-    default: return ev.event_type
-  }
-}
-
-const dotColors: Record<string, string> = {
-  infection: 'var(--color-green)',
-  elimination: 'var(--color-red)',
-  vaccine_used: '#4499ff',
-  shotgun_fired: 'var(--color-warning)',
-  zombie_played: '#8000ff',
-  game_start: 'var(--color-text-muted)',
-  game_end: 'var(--color-text)',
-}
 
 function sortPlayers(players: PlayerRow[], winnerPlayerId: string | null, stats: Record<string, PlayerStats>): PlayerRow[] {
   return [...players].sort((a, b) => {
@@ -137,7 +103,6 @@ export default function Results() {
   const { user } = useGameStore()
   const [players, setPlayers] = useState<PlayerRow[]>([])
   const [gameState, setGameState] = useState<GameStateResult | null>(null)
-  const [events, setEvents] = useState<GameEvent[]>([])
   const [roundLogs, setRoundLogs] = useState<RoundLogEntry[]>([])
   const [stats, setStats] = useState<Record<string, PlayerStats>>({})
   const [tab, setTab] = useState<Tab>('scoreboard')
@@ -149,16 +114,14 @@ export default function Results() {
       const { data: room } = await supabase.from('rooms').select('*').eq('code', code!.toUpperCase()).single()
       if (!room) { navigate('/'); return }
 
-      const [{ data: ps }, { data: gs }, { data: evs }, { data: logs }] = await Promise.all([
+      const [{ data: ps }, { data: gs }, { data: logs }] = await Promise.all([
         supabase.from('players').select('*').eq('room_id', room.id),
         supabase.from('game_state').select('round_number,winner_faction,winner_player_id').eq('room_id', room.id).single(),
-        supabase.from('game_events').select('*').eq('room_id', room.id).order('created_at', { ascending: true }),
         supabase.from('round_log').select('round_number,outcomes').eq('room_id', room.id).order('round_number', { ascending: true }),
       ])
 
       if (ps) setPlayers(ps as PlayerRow[])
       if (gs) setGameState(gs as GameStateResult)
-      if (evs) setEvents(evs as GameEvent[])
       if (logs) {
         const parsed: RoundLogEntry[] = (logs as { round_number: number; outcomes: unknown }[]).map(l => ({
           round_number: l.round_number,

@@ -14,29 +14,6 @@ function cardDistribution(players: number) {
   return { zombieCount, vaccineCount, shotgunCount }
 }
 
-function ToggleSwitch({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <button
-      role="switch"
-      aria-checked={value}
-      onClick={() => onChange(!value)}
-      style={{
-        position: 'relative', width: '40px', height: '20px',
-        background: value ? 'rgba(204,0,0,0.2)' : 'var(--color-surface-2)',
-        border: `1px solid ${value ? 'var(--color-red)' : 'var(--color-border)'}`,
-        borderRadius: '2px', cursor: 'pointer', transition: 'all 150ms ease', flexShrink: 0,
-      }}
-    >
-      <span style={{
-        position: 'absolute', top: '2px', left: value ? 'calc(100% - 18px)' : '2px',
-        width: '14px', height: '14px',
-        background: value ? 'var(--color-red)' : 'var(--color-text-muted)',
-        transition: 'all 150ms ease', borderRadius: '1px', display: 'block',
-      }} />
-    </button>
-  )
-}
-
 function SegmentedControl({ options, value, onChange }: { options: { label: string; value: string | number }[]; value: string | number; onChange: (v: string | number) => void }) {
   return (
     <div style={{ display: 'flex' }}>

@@ -312,11 +312,6 @@ export default function GameRoundScreen() {
   const numericTotal = playZoneCards.filter(c => c.type === 'number').reduce((s, c) => s + c.value, 0)
   const specialInZone = playZoneCards.find(c => c.type !== 'number')
 
-  const timerColor = timeLeft > 10 ? 'var(--color-text)' : timeLeft > 5 ? 'var(--color-warning)' : 'var(--color-red)'
-  const timerDisplay = isNegotiating
-    ? `${String(Math.floor(timeLeft / 60)).padStart(2, '0')}:${String(timeLeft % 60).padStart(2, '0')}`
-    : String(timeLeft)
-
   const infectionStatus = myPlayer.status === 'infected'
 
   return (

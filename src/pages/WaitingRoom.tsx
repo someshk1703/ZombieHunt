@@ -88,7 +88,6 @@ export default function WaitingRoom() {
   const humanPlayers = useMemo(() => players.filter(p => !p.is_bot), [players])
   const readyCount = useMemo(() => humanPlayers.filter(p => p.is_ready).length, [humanPlayers])
   const allReady = humanPlayers.length > 0 && readyCount === humanPlayers.length && players.length >= 3
-  const _hostPlayer = useMemo(() => players.find(p => p.is_host), [players])
 
   // QR code generation
   useEffect(() => {
