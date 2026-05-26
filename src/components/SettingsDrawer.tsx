@@ -74,10 +74,12 @@ function SegmentedControl({ options, value, onChange }: {
 }
 
 function cardDistribution(players: number) {
+  const zombieCount = Math.min(Math.max(1, Math.floor(players / 5)), players - 1)
+  const vaccineCount = Math.min(Math.max(1, Math.floor(players / 4)), players - zombieCount)
   return {
-    zombieCount: Math.floor(players / 5),
-    vaccineCount: Math.floor(players / 4),
-    shotgunCount: players - Math.floor(players / 5),
+    zombieCount,
+    vaccineCount,
+    shotgunCount: players - zombieCount,
   }
 }
 
@@ -228,7 +230,7 @@ export default function SettingsDrawer({ open, onClose, roomId, currentSettings,
             <div style={sectionStyle}>
               <p style={labelStyle}>Action Timer</p>
               <SegmentedControl
-                options={[{ label: '10s', value: 10 }, { label: '20s', value: 20 }, { label: '30s', value: 30 }]}
+                options={[{ label: '1 MIN', value: 60 }, { label: '2 MIN', value: 120 }, { label: '3 MIN', value: 180 }]}
                 value={timer}
                 onChange={v => setTimer(v as number)}
               />

@@ -19,8 +19,8 @@ interface RoomInfoProps {
 }
 
 function cardDistribution(players: number) {
-  const zombieCount = Math.floor(players / 5)
-  const vaccineCount = Math.floor(players / 4)
+  const zombieCount = Math.min(Math.max(1, Math.floor(players / 5)), players - 1)
+  const vaccineCount = Math.min(Math.max(1, Math.floor(players / 4)), players - zombieCount)
   const shotgunCount = players - zombieCount
   return { zombieCount, vaccineCount, shotgunCount }
 }

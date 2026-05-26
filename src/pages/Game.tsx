@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase'
 import { audioManager } from '../lib/audio'
 import { GameProvider, GameRoom, GamePlayer, GameState, useGame } from '../context/GameContext'
 import AtmosphericBackground from '../components/AtmosphericBackground'
+import DevPanel from '../components/DevPanel'
 import DealingScreen from '../components/game/DealingScreen'
 import HandReviewScreen from '../components/game/HandReviewScreen'
 import GameRoundScreen from '../components/game/GameRoundScreen'
@@ -13,9 +14,83 @@ import EliminationCheckScreen from '../components/game/EliminationCheckScreen'
 import WinRevealScreen from '../components/game/WinRevealScreen'
 import GhostOverlay from '../components/game/GhostOverlay'
 import DeathScreen from '../components/game/DeathScreen'
+import DiscussionRoundScreen from '../components/game/DiscussionRoundScreen'
+
+function ByeWaitingScreen({ players, roundNumber }: { players: GamePlayer[]; roundNumber: number }) {
+  const alive = players.filter(p => p.status !== 'eliminated' && p.user_id !== '00000000-0000-0000-0000-000000000000')
+  const competing = alive
+
+  return (
+    <div style={{
+      minHeight: '100vh',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      background: 'var(--color-bg)',
+      fontFamily: "'IBM Plex Mono', monospace",
+      padding: '24px',
+      gap: '24px',
+    }}>
+      <div style={{
+        fontSize: '11px',
+        letterSpacing: '0.3em',
+        color: 'var(--color-text-muted)',
+        textTransform: 'uppercase',
+      }}>
+        ROUND {roundNumber}
+      </div>
+      <div style={{
+        fontSize: '22px',
+        fontWeight: 700,
+        letterSpacing: '0.15em',
+        color: 'var(--color-warning, #f59e0b)',
+        textAlign: 'center',
+        textTransform: 'uppercase',
+      }}>
+        BYE — WAITING
+      </div>
+      <div style={{
+        maxWidth: '320px',
+        textAlign: 'center',
+        fontSize: '12px',
+        lineHeight: '1.8',
+        color: 'var(--color-text-muted)',
+        letterSpacing: '0.05em',
+      }}>
+        You have a bye this round. <br />
+        {competing.length - 1} other survivor{competing.length - 1 !== 1 ? 's are' : ' is'} dueling right now.
+        <br /><br />
+        You will rejoin the next round when an odd number of players remain.
+      </div>
+      <div style={{
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: '8px',
+        justifyContent: 'center',
+        maxWidth: '360px',
+      }}>
+        {competing.map(p => (
+          <div key={p.id} style={{
+            fontSize: '10px',
+            letterSpacing: '0.1em',
+            color: p.status === 'infected' ? 'var(--color-zombie, #4ade80)' : 'var(--color-text-muted)',
+            padding: '4px 10px',
+            border: '1px solid',
+            borderColor: p.status === 'infected' ? 'var(--color-zombie, #4ade80)' : 'rgba(255,255,255,0.15)',
+            borderRadius: '4px',
+            textTransform: 'uppercase',
+          }}>
+            {p.username}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 function GamePhaseRouter() {
-  const { gameState, myPlayer, isGhost } = useGame()
+  const { gameState, myPlayer, isGhost, players } = useGame()
   const wasEliminatedRef = useRef(false)
   const [showDeathScreen, setShowDeathScreen] = useState(false)
 
@@ -25,6 +100,8 @@ function GamePhaseRouter() {
       setShowDeathScreen(true)
     }
   }, [myPlayer.status])
+
+  const isByePlayer = gameState.bye_player_id === myPlayer.id
 
   return (
     <div style={{ position: 'relative', minHeight: '100vh' }}>
@@ -40,9 +117,13 @@ function GamePhaseRouter() {
         <>
           {gameState.phase === 'deal' && <DealingScreen />}
           {gameState.phase === 'hand_review' && <HandReviewScreen />}
-          {gameState.phase === 'blind_action' && <GameRoundScreen />}
+          {gameState.phase === 'blind_action' && !isByePlayer && <GameRoundScreen />}
+          {gameState.phase === 'blind_action' && isByePlayer && (
+            <ByeWaitingScreen players={players} roundNumber={gameState.round_number} />
+          )}
           {gameState.phase === 'reveal' && <RevealScreen />}
           {gameState.phase === 'elimination_check' && <EliminationCheckScreen />}
+          {gameState.phase === 'discussion' && <DiscussionRoundScreen />}
           {gameState.phase === 'finished' && <WinRevealScreen />}
         </>
       )}
@@ -116,6 +197,7 @@ export default function Game() {
   return (
     <GameProvider room={room} initialPlayers={players} gameState={gameState} myPlayer={myPlayer}>
       <GamePhaseRouter />
+      <DevPanel roomId={room.id} gameStateId={gameState.id} />
     </GameProvider>
   )
 }

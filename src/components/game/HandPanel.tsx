@@ -42,7 +42,7 @@ function DraggableCard({
   return (
     <div ref={setNodeRef} style={style} {...listeners} {...attributes} onClick={!isDragging ? onClick : undefined}>
       <div style={{ filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.8))' }}>
-        <CardFace card={card} size="sm" />
+        <CardFace card={card} size="md" />
       </div>
       {inZone && (
         <div style={{
@@ -73,10 +73,10 @@ export default function HandPanel({ playZoneCardIds, onAddToZone, onRemoveFromZo
 
   return (
     <div style={{
-      height: '160px', background: 'linear-gradient(180deg, #141416 0%, #0f0f11 100%)',
+      background: 'linear-gradient(180deg, #141416 0%, #0f0f11 100%)',
       borderTop: '1px solid #383838',
       display: 'flex', flexDirection: 'column',
-      padding: '8px 16px', flexShrink: 0,
+      padding: '10px 16px 12px', flexShrink: 0,
       boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
@@ -90,8 +90,9 @@ export default function HandPanel({ playZoneCardIds, onAddToZone, onRemoveFromZo
         )}
       </div>
       <div style={{
-        display: 'flex', gap: '8px', overflowX: 'auto', flex: 1,
-        alignItems: 'center', paddingBottom: '4px',
+        display: 'flex', gap: '10px', flex: 1,
+        alignItems: 'center', justifyContent: 'center',
+        flexWrap: 'wrap', paddingBottom: '4px',
       }}>
         {availableCards.map(card => (
           <DraggableCard
@@ -104,7 +105,7 @@ export default function HandPanel({ playZoneCardIds, onAddToZone, onRemoveFromZo
         ))}
         {usedCards.map(card => (
           <div key={card.id} style={{ position: 'relative', flexShrink: 0, opacity: 0.3, filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.8))' }}>
-            <CardFace card={card} size="sm" />
+            <CardFace card={card} size="md" />
             <div style={{
               position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
               background: 'rgba(0,0,0,0.6)',

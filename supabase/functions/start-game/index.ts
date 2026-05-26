@@ -40,18 +40,25 @@ Deno.serve(async (req) => {
       })
     }
 
-    // 3. Validate player count >= 3
-    const { data: players, error: playersErr } = await supabase
+    // 3. Validate player count — need at least 1 human and 3 total (humans + lobby bots)
+    const { data: humanPlayers, error: playersErr } = await supabase
       .from('players').select('id, user_id').eq('room_id', room_id).eq('is_bot', false)
-    if (playersErr || !players || players.length < 3) {
-      return new Response(JSON.stringify({ error: 'Need at least 3 players' }), {
+    const { data: allExistingPlayers } = await supabase
+      .from('players').select('id, user_id').eq('room_id', room_id)
+    if (playersErr || !humanPlayers || humanPlayers.length < 1) {
+      return new Response(JSON.stringify({ error: 'Need at least 1 human player' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+    if (!allExistingPlayers || allExistingPlayers.length < 3) {
+      return new Response(JSON.stringify({ error: 'Need at least 3 players total (add bots in lobby)' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
-    // 3.5 Create Subject Zero bot if odd player count
+    // 3.5 Create Subject Zero bot if TOTAL player count (humans + lobby bots) is odd
     const SUBJECT_ZERO_UUID = '00000000-0000-0000-0000-000000000000'
-    if (players.length % 2 !== 0) {
+    if (allExistingPlayers.length % 2 !== 0) {
       const { data: existing } = await supabase
         .from('players').select('id').eq('room_id', room_id).eq('user_id', SUBJECT_ZERO_UUID).maybeSingle()
       if (!existing) {
@@ -61,20 +68,19 @@ Deno.serve(async (req) => {
           username: 'SUBJECT ZERO',
           avatar_url: 'https://api.dicebear.com/7.x/bottts/svg?seed=subjectzero&backgroundColor=0a1f0a',
           status: 'alive',
-          lives: 999,
+          lives: 1,
           is_bot: true,
           is_host: false,
           is_ready: true,
           hand: [],
-          score: 0,
         })
       }
     }
 
-    // Re-fetch all players including bot
+    // Re-fetch all players including bot (include is_bot so dealCards can filter lobby bots)
     const { data: allPlayersData } = await supabase
-      .from('players').select('id, user_id').eq('room_id', room_id)
-    const allPlayers = allPlayersData ?? players
+      .from('players').select('id, user_id, is_bot').eq('room_id', room_id)
+    const allPlayers = allPlayersData ?? []
 
     // 4. Set room status to playing
     await supabase.from('rooms').update({ status: 'playing' }).eq('id', room_id)

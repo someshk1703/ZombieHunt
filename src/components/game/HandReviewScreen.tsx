@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { motion } from 'framer-motion'
 import {
   DndContext,
@@ -36,23 +36,26 @@ function cardLabel(card: Card): string {
   return `${val} OF ${card.suit?.toUpperCase() ?? ''}`
 }
 
-function generatePairs(players: { id: string; status: string; is_bot?: boolean }[]) {
-  const SUBJECT_ZERO_UUID_PREFIX = '00000000'
-  const sz = players.find(p => p.is_bot)
-  const humanAlive = players.filter(p =>
-    !p.is_bot && (p.status === 'alive' || p.status === 'infected')
+const SUBJECT_ZERO_UUID = '00000000-0000-0000-0000-000000000000'
+
+function generatePairs(players: { id: string; user_id: string; status: string }[]) {
+  // Subject Zero is the special bye-player bot — exclude from active pool
+  const subjectZero = players.find(p => p.user_id === SUBJECT_ZERO_UUID)
+  // All alive/infected players except Subject Zero (humans + lobby bots alike)
+  const active = players.filter(
+    p => p.user_id !== SUBJECT_ZERO_UUID && (p.status === 'alive' || p.status === 'infected')
   )
-  const shuffled = [...humanAlive].sort(() => Math.random() - 0.5)
+  const shuffled = [...active].sort(() => Math.random() - 0.5)
   const pairs: string[][] = []
-  for (let i = 0; i < shuffled.length - 1; i += 2) {
+  for (let i = 0; i + 1 < shuffled.length; i += 2) {
     pairs.push([shuffled[i].id, shuffled[i + 1].id])
   }
-  // Pair odd-one-out with Subject Zero bot
-  if (shuffled.length % 2 !== 0 && sz) {
-    pairs.push([shuffled[shuffled.length - 1].id, sz.id])
+  // Odd active count → pair last with Subject Zero, or mark as bye
+  const isOdd = shuffled.length % 2 !== 0
+  if (isOdd && subjectZero) {
+    pairs.push([shuffled[shuffled.length - 1].id, subjectZero.id])
   }
-  const bye = shuffled.length % 2 !== 0 && !sz ? shuffled[shuffled.length - 1].id : null
-  void SUBJECT_ZERO_UUID_PREFIX // suppress unused warning
+  const bye = isOdd && !subjectZero ? shuffled[shuffled.length - 1].id : null
   return { pairs, bye }
 }
 
@@ -92,6 +95,7 @@ export default function HandReviewScreen() {
   const [activeId, setActiveId] = useState<string | null>(null)
   const [timeLeft, setTimeLeft] = useState<number>(15)
   const [transitioning, setTransitioning] = useState(false)
+  const transitioningRef = useRef(false)
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -106,7 +110,7 @@ export default function HandReviewScreen() {
     function tick() {
       const remaining = Math.max(0, Math.floor((new Date(gameState.phase_deadline!).getTime() - Date.now()) / 1000))
       setTimeLeft(remaining)
-      if (remaining === 0 && !transitioning) handlePhaseEnd()
+      if (remaining === 0 && !transitioningRef.current) handlePhaseEnd()
     }
 
     tick()
@@ -115,7 +119,8 @@ export default function HandReviewScreen() {
   }, [gameState.phase_deadline])
 
   const handlePhaseEnd = useCallback(async () => {
-    if (transitioning) return
+    if (transitioningRef.current) return
+    transitioningRef.current = true
     setTransitioning(true)
 
     // Save hand order to Supabase
@@ -128,12 +133,14 @@ export default function HandReviewScreen() {
     if (isHost) {
       const { pairs, bye } = generatePairs(players)
       const roundTimer = room.settings.round_timer_seconds
-      const deadline = new Date(Date.now() + roundTimer * 1000).toISOString()
+      const negotiationDeadline = new Date(Date.now() + roundTimer * 1000).toISOString()
+      const phaseDeadline = new Date(Date.now() + roundTimer * 1000 + 30000).toISOString()
       await supabase.from('game_state').update({
         phase: 'blind_action',
         pairs,
         bye_player_id: bye,
-        phase_deadline: deadline,
+        negotiation_deadline: negotiationDeadline,
+        phase_deadline: phaseDeadline,
         round_number: gameState.round_number,
       }).eq('id', gameState.id)
     }
@@ -254,6 +261,8 @@ export default function HandReviewScreen() {
         <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '11px', color: 'var(--color-text-muted)', textAlign: 'center', marginTop: '8px' }}>
           Your hand is set. Waiting for the game to begin.
         </p>
+
+
       </div>
     </div>
   )

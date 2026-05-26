@@ -95,18 +95,12 @@ export default function LobbyChat({ roomId, initialMessages }: LobbyChatProps) {
     display: 'flex',
     flexDirection: 'column',
     height: '100%',
-    minHeight: '400px',
     overflow: 'hidden',
   }
 
   return (
     <div style={panelStyle}>
-      {/* Header */}
-      <div style={{ padding: '16px', borderBottom: '1px solid var(--color-border)', flexShrink: 0, background: '#22222c' }}>
-        <span style={{ fontFamily: "'Bebas Neue', cursive", fontSize: '18px', color: 'var(--color-text)', letterSpacing: '0.05em' }}>
-          COMMS
-        </span>
-      </div>
+      {/* Reaction bar */}
 
       {/* Reaction bar */}
       <div style={{ display: 'flex', gap: '4px', padding: '8px 12px', borderBottom: '1px solid rgba(255,255,255,0.05)', background: '#1a1a22', flexShrink: 0 }}>

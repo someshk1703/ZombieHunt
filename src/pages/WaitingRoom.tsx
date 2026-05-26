@@ -1,16 +1,17 @@
 import { useEffect, useState, useMemo, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { motion, AnimatePresence } from 'framer-motion'
+import QRCode from 'qrcode'
 import { useGameStore } from '../store/gameStore'
 import { supabase } from '../lib/supabase'
 import { useToast } from '../components/Toast'
 import { audioManager } from '../lib/audio'
 import AtmosphericBackground from '../components/AtmosphericBackground'
-import PlayerRing from '../components/PlayerRing'
 import LobbyChat from '../components/LobbyChat'
-import RoomInfo from '../components/RoomInfo'
 import SettingsDrawer from '../components/SettingsDrawer'
 import JoinRoomModal from '../components/JoinRoomModal'
 import { Copy } from 'lucide-react'
+import DevPanel from '../components/DevPanel'
 
 interface RoomSettings {
   room_name?: string
@@ -37,6 +38,7 @@ interface Player {
   avatar_url: string
   is_host: boolean
   is_ready: boolean
+  is_bot?: boolean
   created_at: string
 }
 
@@ -65,13 +67,37 @@ export default function WaitingRoom() {
   const [codeCopied, setCodeCopied] = useState(false)
   const [showJoinModal, setShowJoinModal] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [commsOpen, setCommsOpen] = useState(true)
+  const [infoOpen, setInfoOpen] = useState(false)
+  const [qrDataUrl, setQrDataUrl] = useState('')
+  const [kickConfirmId, setKickConfirmId] = useState<string | null>(null)
+
+  function cardDistribution(count: number) {
+    const zombieCount = Math.min(Math.max(1, Math.floor(count / 5)), count - 1)
+    const vaccineCount = Math.min(Math.max(1, Math.floor(count / 4)), count - zombieCount)
+    return {
+      zombieCount,
+      vaccineCount,
+      shotgunCount: count - zombieCount,
+    }
+  }
 
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const isHost = useMemo(() => players.find(p => p.user_id === user?.id)?.is_host ?? false, [players, user])
   const myPlayer = useMemo(() => players.find(p => p.user_id === user?.id), [players, user])
-  const readyCount = useMemo(() => players.filter(p => p.is_ready).length, [players])
-  const allReady = readyCount === players.length && players.length >= 3
-  const hostPlayer = useMemo(() => players.find(p => p.is_host), [players])
+  const humanPlayers = useMemo(() => players.filter(p => !p.is_bot), [players])
+  const readyCount = useMemo(() => humanPlayers.filter(p => p.is_ready).length, [humanPlayers])
+  const allReady = humanPlayers.length > 0 && readyCount === humanPlayers.length && players.length >= 3
+  const _hostPlayer = useMemo(() => players.find(p => p.is_host), [players])
+
+  // QR code generation
+  useEffect(() => {
+    if (!room) return
+    QRCode.toDataURL(`${window.location.origin}/room/${room.code}`, {
+      width: 120, margin: 1,
+      color: { dark: '#0a0a0a', light: '#e8e8e8' },
+    }).then(setQrDataUrl).catch(() => {})
+  }, [room?.code])
 
   // Start lobby ambient on first user interaction
   useEffect(() => {
@@ -269,6 +295,40 @@ export default function WaitingRoom() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [room])
 
+  const BOT_NAMES = [
+    'ROTTEN RON', 'BRAIN EATER', 'DEAD ED', 'GROANING GARY',
+    'LIMPING LEE', 'PALE PETE', 'MOANING MAX', 'CREEPY CORA',
+    'CORPSE CARL', 'SHAMBLING SHELLY',
+  ]
+
+  async function handleAddBot() {
+    if (!room || !user) return
+    if (players.length >= room.settings.max_players) {
+      showToast('Room is full — remove a player first', 'error')
+      return
+    }
+    const existingBots = players.filter(p => p.is_bot)
+    const name = BOT_NAMES[existingBots.length % BOT_NAMES.length]
+    const botUserId = crypto.randomUUID()
+    const { error } = await supabase.from('players').insert({
+      room_id: room.id,
+      user_id: botUserId,
+      username: name,
+      avatar_url: `https://api.dicebear.com/7.x/bottts/svg?seed=${botUserId}&backgroundColor=1a0a0a`,
+      is_host: false,
+      is_ready: true,
+      is_bot: true,
+      status: 'alive',
+      lives: 1,
+      hand: [],
+    })
+    if (error) showToast('Failed to add bot', 'error')
+  }
+
+  async function handleRemoveBot(bot: Player) {
+    await supabase.from('players').delete().eq('id', bot.id)
+  }
+
   async function handleLeave() {
     if (!myPlayer || !room) return
     if (isHost) {
@@ -336,17 +396,20 @@ export default function WaitingRoom() {
         />
       )}
 
+      <DevPanel roomId={room.id} />
+
       <div style={{ position: 'relative', zIndex: 1, maxWidth: '1200px', margin: '0 auto', padding: '24px' }} className="waiting-room-layout">
         {/* Room header */}
         <div
           className="waiting-room-header"
           style={{
-            display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
+            position: 'relative', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
             paddingBottom: '16px', borderBottom: '1px solid var(--color-border)', marginBottom: '24px',
           }}
         >
           <div>
-            <h1 style={{ fontFamily: "'Bebas Neue', cursive", fontSize: '32px', color: 'var(--color-text)', letterSpacing: '0.05em' }}>
+            <div style={{ fontFamily: "'Bebas Neue', cursive", fontSize: '11px', color: 'var(--color-red)', letterSpacing: '0.2em', marginBottom: '2px' }}>ZOMBIE HUNT</div>
+            <h1 style={{ fontFamily: "'Bebas Neue', cursive", fontSize: '32px', color: 'var(--color-text)', letterSpacing: '0.05em', lineHeight: 1, margin: 0 }}>
               {room.settings.room_name ?? 'LOBBY'}
             </h1>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
@@ -365,6 +428,10 @@ export default function WaitingRoom() {
               </button>
             </div>
           </div>
+          {/* Center title */}
+          <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)', textAlign: 'center', pointerEvents: 'none' }}>
+            <span style={{ fontFamily: "'Bebas Neue', cursive", fontSize: '30px', color: 'var(--color-text-muted)', letterSpacing: '0.25em' }}>LOBBY SCREEN</span>
+          </div>
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             {isHost && room.status === 'lobby' && (
               <button className="btn-secondary" style={{ fontSize: '12px' }} onClick={() => setDrawerOpen(true)}>
@@ -381,49 +448,321 @@ export default function WaitingRoom() {
           </div>
         </div>
 
-        {/* Three-column grid */}
-        <div
-          className="waiting-room-grid"
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'clamp(220px, 25%, 280px) 1fr clamp(220px, 25%, 280px)',
-            gap: '24px',
-            alignItems: 'start',
-          }}
-        >
-          {/* Left — Chat */}
-          <div className="waiting-room-chat" style={{ minHeight: '600px', display: 'flex', flexDirection: 'column', background: 'var(--color-surface-grey)', borderRight: '1px solid rgba(255,255,255,0.06)' }}>
-            <LobbyChat roomId={room.id} initialMessages={initialChat} />
-          </div>
+        {/* Two-column layout: left sidebar + player grid */}
+        <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start' }}>
 
-          {/* Center — Player ring */}
-          <div className="player-ring-container" style={{
-            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '24px',
-            background: 'radial-gradient(ellipse 65% 65% at center, rgba(30,0,0,0.25) 0%, transparent 70%)',
+          {/* ── LEFT SIDEBAR ── */}
+          <div style={{
+            width: '272px', flexShrink: 0,
+            display: 'flex', flexDirection: 'column', gap: '0',
+            background: '#13131a', border: '1px solid var(--color-border)',
           }}>
-            <PlayerRing
-              players={players}
-              maxPlayers={room.settings.max_players}
-              currentUserId={user?.id}
-              isHost={isHost}
-              countdown={countdown}
-              readyCount={readyCount}
-              onKick={handleKick}
-              onReadyToggle={handleReadyToggle}
-              onForceStart={handleForceStart}
-              onCancelCountdown={handleCancelCountdown}
-            />
+
+            {/* Accordion 1 — COMMS */}
+            <div>
+              <button
+                onClick={() => setCommsOpen(v => !v)}
+                style={{
+                  width: '100%', display: 'flex', alignItems: 'center', gap: '10px',
+                  padding: '12px 14px', background: '#1a1a24',
+                  border: 'none', borderBottom: '1px solid var(--color-border)',
+                  cursor: 'pointer', color: 'var(--color-text)',
+                }}
+              >
+                <span style={{ fontSize: '16px', lineHeight: 1 }}>☰</span>
+                <span style={{ fontFamily: "'Bebas Neue', cursive", fontSize: '16px', letterSpacing: '0.08em', flex: 1, textAlign: 'left' }}>COMMS</span>
+                <span style={{ fontSize: '12px', color: 'var(--color-text-muted)', transition: 'transform 200ms', display: 'inline-block', transform: commsOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+              </button>
+              <AnimatePresence initial={false}>
+                {commsOpen && (
+                  <motion.div
+                    key="comms"
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 320, opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                    style={{ overflow: 'hidden', borderBottom: '1px solid var(--color-border)' }}
+                  >
+                    <div style={{ height: '320px', display: 'flex', flexDirection: 'column' }}>
+                      <LobbyChat roomId={room.id} initialMessages={initialChat} />
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Accordion 2 — ROOM INFO */}
+            <div>
+              <button
+                onClick={() => setInfoOpen(v => !v)}
+                style={{
+                  width: '100%', display: 'flex', alignItems: 'center', gap: '10px',
+                  padding: '12px 14px', background: '#1a1a24',
+                  border: 'none', borderBottom: '1px solid var(--color-border)',
+                  cursor: 'pointer', color: 'var(--color-text)',
+                }}
+              >
+                <span style={{ fontSize: '16px', lineHeight: 1 }}>☰</span>
+                <span style={{ fontFamily: "'Bebas Neue', cursive", fontSize: '16px', letterSpacing: '0.08em', flex: 1, textAlign: 'left' }}>ROOM INFO</span>
+                <span style={{ fontSize: '12px', color: 'var(--color-text-muted)', transition: 'transform 200ms', display: 'inline-block', transform: infoOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+              </button>
+              <AnimatePresence initial={false}>
+                {infoOpen && (() => {
+                  const dist = cardDistribution(players.length)
+                  const timerMins = Math.round((room.settings.round_timer_seconds ?? 60) / 60)
+                  const totalRounds = (room.settings as unknown as { total_rounds?: number }).total_rounds ?? 10
+                  return (
+                    <motion.div
+                      key="info"
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                      style={{ overflow: 'hidden', borderBottom: '1px solid var(--color-border)' }}
+                    >
+                      <div style={{ padding: '14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {([
+                          ['Max Players', String(room.settings.max_players)],
+                          ['Action Timer', `${timerMins} min`],
+                          ['Total Rounds', String(totalRounds)],
+                          ['Cards', `${dist.zombieCount}🧟 · ${dist.vaccineCount}💉 · ${dist.shotgunCount}🔫`],
+                        ] as [string,string][]).map(([label, value]) => (
+                          <div key={label} style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '6px', borderBottom: '1px dashed var(--color-border)' }}>
+                            <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '10px', color: 'var(--color-text-muted)' }}>{label}</span>
+                            <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '10px', color: 'var(--color-text)' }}>{value}</span>
+                          </div>
+                        ))}
+                        {/* Invite link */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', paddingBottom: '8px', borderBottom: '1px dashed var(--color-border)' }}>
+                          <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '9px', color: 'var(--color-text-muted)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {window.location.origin}/room/{room.code}
+                          </span>
+                          <button
+                            onClick={copyCode}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: codeCopied ? 'var(--color-green)' : 'var(--color-text-muted)', flexShrink: 0 }}
+                          >
+                            {codeCopied ? '✓' : <Copy size={12} />}
+                          </button>
+                        </div>
+                        {/* QR Code */}
+                        {qrDataUrl && (
+                          <div style={{ display: 'flex', justifyContent: 'center', paddingTop: '4px' }}>
+                            <img src={qrDataUrl} alt="QR" style={{ width: '100px', height: '100px', imageRendering: 'pixelated' }} />
+                          </div>
+                        )}
+                      </div>
+                    </motion.div>
+                  )
+                })()}
+              </AnimatePresence>
+            </div>
+
+            {/* ── Bottom: title + player count + action button ── */}
+            <div style={{ padding: '16px 14px', marginTop: 'auto' }}>
+              <div style={{ textAlign: 'center', marginBottom: '10px' }}>
+                <div style={{ fontFamily: "'Bebas Neue', cursive", fontSize: '22px', color: 'var(--color-red)', letterSpacing: '0.05em' }}>ZOMBIE HUNT</div>
+                <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '2px' }}>
+                  {players.length} / {room.settings.max_players} PLAYERS
+                </div>
+              </div>
+
+              {/* Countdown overlay */}
+              {countdown !== null && (
+                <div style={{ textAlign: 'center', marginBottom: '10px' }}>
+                  <motion.span
+                    key={countdown}
+                    initial={{ scale: 1.3, opacity: 0.5 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    style={{ fontFamily: "'Bebas Neue', cursive", fontSize: '48px', color: 'var(--color-red)', lineHeight: 1, display: 'block' }}
+                  >
+                    {countdown}
+                  </motion.span>
+                  <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '10px', color: 'var(--color-text-muted)' }}>GAME STARTING</span>
+                </div>
+              )}
+
+              {/* Host actions */}
+              {isHost && countdown === null && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <button
+                    onClick={handleForceStart}
+                    disabled={players.length < 3}
+                    style={{
+                      width: '100%', padding: '12px',
+                      fontFamily: "'Bebas Neue', cursive", fontSize: '18px', letterSpacing: '0.08em',
+                      background: players.length < 3 ? 'rgba(0,160,0,0.15)' : 'rgba(0,200,0,0.85)',
+                      border: '1px solid #00c800',
+                      color: players.length < 3 ? '#005500' : '#001800',
+                      cursor: players.length < 3 ? 'not-allowed' : 'pointer',
+                      transition: 'all 150ms',
+                    }}
+                  >
+                    START GAME
+                  </button>
+                  {players.length < room.settings.max_players && (
+                    <button
+                      onClick={handleAddBot}
+                      style={{
+                        width: '100%', padding: '8px',
+                        fontFamily: "'IBM Plex Mono', monospace", fontSize: '11px', letterSpacing: '0.06em',
+                        background: 'rgba(255,107,0,0.08)',
+                        border: '1px solid rgba(255,107,0,0.4)',
+                        color: 'var(--color-warning)',
+                        cursor: 'pointer', transition: 'all 150ms',
+                      }}
+                    >
+                      🤖 ADD BOT
+                    </button>
+                  )}
+                </div>
+              )}
+              {isHost && countdown !== null && (
+                <button
+                  onClick={handleCancelCountdown}
+                  style={{
+                    width: '100%', padding: '10px',
+                    fontFamily: "'IBM Plex Mono', monospace", fontSize: '11px', letterSpacing: '0.1em',
+                    background: 'transparent', border: '1px solid var(--color-red)',
+                    color: 'var(--color-red)', cursor: 'pointer',
+                  }}
+                >
+                  CANCEL
+                </button>
+              )}
+              {/* Non-host ready toggle */}
+              {!isHost && myPlayer && (
+                <button
+                  onClick={handleReadyToggle}
+                  style={{
+                    width: '100%', padding: '12px',
+                    fontFamily: "'Bebas Neue', cursive", fontSize: '18px', letterSpacing: '0.08em',
+                    background: myPlayer.is_ready ? 'rgba(0,200,0,0.15)' : 'transparent',
+                    border: `1px solid ${myPlayer.is_ready ? '#00c800' : 'var(--color-border)'}`,
+                    color: myPlayer.is_ready ? '#00c800' : 'var(--color-text-muted)',
+                    cursor: 'pointer', transition: 'all 150ms',
+                  }}
+                >
+                  {myPlayer.is_ready ? '✓ READY' : 'MARK READY'}
+                </button>
+              )}
+            </div>
           </div>
 
-          {/* Right — Room info */}
-          <div className="room-info-panel" style={{ background: 'linear-gradient(180deg, rgba(16,14,20,0.97) 0%, rgba(14,14,18,0.97) 100%)', borderLeft: '1px solid rgba(255,255,255,0.05)', padding: '16px' }}>
-            <RoomInfo
-              roomCode={room.code}
-              settings={room.settings}
-              playerCount={players.length}
-              hostUsername={hostPlayer?.username ?? ''}
-            />
+          {/* ── PLAYER CARD GRID ── */}
+          <div style={{ flex: 1, overflowY: 'auto', maxHeight: 'calc(100vh - 160px)' }}>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+              gap: '12px',
+              padding: '4px 2px',
+            }}>
+              {/* Filled player slots */}
+              {players.map(player => {
+                const isSelf = player.user_id === user?.id
+                const isBot = player.is_bot === true
+                const isBeingKicked = kickConfirmId === player.id
+                return (
+                  <div key={player.id} style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
+                    <div style={{
+                      width: '140px', padding: '14px 10px',
+                      background: isBot ? '#0d0d0a' : isSelf ? '#220e0e' : '#1C1C22',
+                      border: `1px solid ${isBot ? 'rgba(255,107,0,0.3)' : isSelf ? '#4a1a1a' : '#3a3a44'}`,
+                      borderTop: player.is_host ? '2px solid #ff6b00' : isBot ? '2px solid rgba(255,107,0,0.5)' : undefined,
+                      display: 'flex', flexDirection: 'column', alignItems: 'center',
+                      position: 'relative',
+                    }}>
+                      {player.is_host && (
+                        <span style={{ position: 'absolute', top: '-8px', right: '-6px', fontSize: '14px' }}>👑</span>
+                      )}
+                      {isBot && (
+                        <span style={{ position: 'absolute', top: '-8px', left: '-6px', fontSize: '12px' }}>🤖</span>
+                      )}
+                      <img
+                        src={player.avatar_url}
+                        alt={player.username}
+                        style={{ width: '60px', height: '60px', borderRadius: '50%', background: '#0a0a0a', border: `2px solid ${isBot ? 'rgba(255,107,0,0.4)' : 'rgba(255,255,255,0.1)'}` }}
+                      />
+                      <span style={{
+                        fontFamily: "'IBM Plex Mono', monospace", fontSize: '11px',
+                        color: isBot ? 'var(--color-warning)' : '#f0f0f0', marginTop: '8px', textAlign: 'center',
+                        maxWidth: '118px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      }}>
+                        {player.username}
+                      </span>
+                      <span style={{
+                        fontFamily: "'IBM Plex Mono', monospace", fontSize: '9px', marginTop: '6px',
+                        padding: '3px 8px',
+                        border: `1px solid ${isSelf ? 'var(--color-red)' : isBot ? 'rgba(255,107,0,0.5)' : player.is_ready ? 'var(--color-green)' : 'var(--color-border)'}`,
+                        color: isSelf ? 'var(--color-red)' : isBot ? 'var(--color-warning)' : player.is_ready ? 'var(--color-green)' : 'var(--color-text-muted)',
+                        background: isBot ? 'rgba(255,107,0,0.06)' : player.is_ready && !isSelf ? 'rgba(0,255,65,0.06)' : 'transparent',
+                        letterSpacing: '0.05em',
+                      }}>
+                        {isSelf ? 'YOU' : isBot ? 'AUTO-PLAY' : player.is_ready ? 'READY' : 'WAITING'}
+                      </span>
+                    </div>
+                    {/* Host controls */}
+                    {isHost && !isSelf && (
+                      <AnimatePresence mode="wait">
+                        {isBot ? (
+                          <motion.button
+                            key="remove-bot"
+                            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                            onClick={() => handleRemoveBot(player)}
+                            style={{
+                              fontFamily: "'IBM Plex Mono', monospace", fontSize: '9px',
+                              color: 'var(--color-warning)', border: '1px solid rgba(255,107,0,0.4)',
+                              background: 'rgba(255,107,0,0.06)', padding: '2px 10px',
+                              cursor: 'pointer', width: '140px', letterSpacing: '0.05em',
+                            }}
+                          >
+                            ✕ REMOVE BOT
+                          </motion.button>
+                        ) : !isBeingKicked ? (
+                          <motion.button
+                            key="kick"
+                            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                            onClick={() => setKickConfirmId(player.id)}
+                            style={{
+                              fontFamily: "'IBM Plex Mono', monospace", fontSize: '9px',
+                              color: 'var(--color-red)', border: '1px solid var(--color-red)',
+                              background: 'rgba(255,0,0,0.06)', padding: '2px 10px',
+                              cursor: 'pointer', width: '140px', letterSpacing: '0.05em',
+                            }}
+                          >
+                            ✕ KICK
+                          </motion.button>
+                        ) : (
+                          <motion.div
+                            key="confirm"
+                            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                            style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', width: '140px' }}
+                          >
+                            <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '8px', color: 'var(--color-text-muted)' }}>KICK {player.username.slice(0, 8).toUpperCase()}?</span>
+                            <div style={{ display: 'flex', gap: '6px' }}>
+                              <button onClick={() => { handleKick(player); setKickConfirmId(null) }} style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '9px', color: 'var(--color-red)', border: '1px solid var(--color-red)', background: 'rgba(255,0,0,0.1)', padding: '2px 10px', cursor: 'pointer' }}>YES</button>
+                              <button onClick={() => setKickConfirmId(null)} style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '9px', color: 'var(--color-text-muted)', border: '1px solid var(--color-border)', background: 'transparent', padding: '2px 10px', cursor: 'pointer' }}>NO</button>
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    )}
+                  </div>
+                )
+              })}
+              {/* Empty slots */}
+              {Array.from({ length: Math.max(0, room.settings.max_players - players.length) }).map((_, i) => (
+                <div key={`empty-${i}`} style={{
+                  width: '140px', height: '148px',
+                  border: '1.5px dashed rgba(58,58,58,0.35)',
+                  background: 'rgba(20,20,22,0.3)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <span style={{ color: 'var(--color-text-muted)', opacity: 0.3, fontSize: '22px' }}>+</span>
+                </div>
+              ))}
+            </div>
           </div>
+
         </div>
       </div>
     </div>

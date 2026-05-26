@@ -41,9 +41,51 @@ export default function DealingScreen() {
     }
   }, [])
 
-  const cards: (Card | null)[] = myHand.length > 0
-    ? myHand
-    : Array(7).fill(null)
+  // Always show 7 cards — pad with nulls so the full hand animates in
+  const cards: (Card | null)[] = [
+    ...myHand,
+    ...Array(Math.max(0, 7 - myHand.length)).fill(null),
+  ]
+
+  // Render a single card slot (shared between both rows)
+  function renderCard(card: Card | null, i: number) {
+    const isFlipped = (flippedCount > i && card !== null && phase === 'flip') || phase === 'done'
+    return (
+      <motion.div
+        key={i}
+        initial={{ y: -300, rotate: Math.random() * 30 - 15, opacity: 0 }}
+        animate={{ y: 0, rotate: 0, opacity: 1 }}
+        transition={{
+          delay: 0.2 + i * 0.18,
+          type: 'spring', stiffness: 200, damping: 18,
+        }}
+        style={{ position: 'relative', perspective: '600px' }}
+      >
+        <motion.div
+          animate={{ rotateY: isFlipped ? 180 : 0 }}
+          transition={{ duration: 0.4 }}
+          style={{ transformStyle: 'preserve-3d', position: 'relative', width: 88, height: 120 }}
+        >
+          {/* Card back face */}
+          <div style={{ position: 'absolute', backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}>
+            <CardBack width={88} height={120} />
+          </div>
+          {/* Card front face */}
+          <div style={{
+            position: 'absolute',
+            backfaceVisibility: 'hidden',
+            WebkitBackfaceVisibility: 'hidden',
+            transform: 'rotateY(180deg)',
+          }}>
+            {card
+              ? <CardFace card={card} size="md" />
+              : <CardBack width={88} height={120} />
+            }
+          </div>
+        </motion.div>
+      </motion.div>
+    )
+  }
 
   return (
     <div style={{
@@ -71,51 +113,17 @@ export default function DealingScreen() {
         )}
       </AnimatePresence>
 
-      {/* Hand row */}
+      {/* Hand — 4 cards on top row, 3 on bottom row */}
       {phase !== 'title' && (
-        <div style={{
-          display: 'flex', gap: '8px', alignItems: 'flex-end',
-          position: 'relative', minHeight: '160px',
-        }}>
-          {cards.map((card, i) => {
-            const isFlipped = flippedCount > i && card && phase === 'flip' || phase === 'done'
-
-            return (
-              <motion.div
-                key={i}
-                initial={{ y: -200, rotate: Math.random() * 30 - 15, opacity: 0 }}
-                animate={{ y: 0, rotate: 0, opacity: 1 }}
-                transition={{
-                  delay: 0.2 + i * 0.2,
-                  type: 'spring', stiffness: 200, damping: 18,
-                }}
-                style={{ position: 'relative', perspective: '600px' }}
-              >
-                <motion.div
-                  animate={{ rotateY: isFlipped ? 180 : 0 }}
-                  transition={{ duration: 0.4, delay: isFlipped ? 0 : 0 }}
-                  style={{ transformStyle: 'preserve-3d', position: 'relative', width: 88, height: 120 }}
-                >
-                  {/* Card back face */}
-                  <div style={{ position: 'absolute', backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}>
-                    <CardBack width={88} height={120} />
-                  </div>
-                  {/* Card front face */}
-                  <div style={{
-                    position: 'absolute',
-                    backfaceVisibility: 'hidden',
-                    WebkitBackfaceVisibility: 'hidden',
-                    transform: 'rotateY(180deg)',
-                  }}>
-                    {card
-                      ? <CardFace card={card} size="md" />
-                      : <CardBack width={88} height={120} />
-                    }
-                  </div>
-                </motion.div>
-              </motion.div>
-            )
-          })}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+          {/* Top row: cards 0–3 */}
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
+            {cards.slice(0, 4).map((card, i) => renderCard(card, i))}
+          </div>
+          {/* Bottom row: cards 4–6 */}
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
+            {cards.slice(4).map((card, i) => renderCard(card, i + 4))}
+          </div>
         </div>
       )}
 

@@ -1,4 +1,4 @@
-type PlayerStatus = 'alive' | 'infected' | 'eliminated'
+type PlayerStatus = 'alive' | 'infected' | 'eliminated' | 'ghost'
 
 interface PlayerStatusBadgeProps {
   status: PlayerStatus
@@ -6,9 +6,10 @@ interface PlayerStatusBadgeProps {
 }
 
 const configs: Record<PlayerStatus, { label: string; color: string }> = {
-  alive:      { label: 'ALIVE',     color: 'var(--color-text-muted)' },
-  infected:   { label: 'INFECTED',  color: 'var(--color-green)' },
+  alive:      { label: 'ALIVE',      color: 'var(--color-text-muted)' },
+  infected:   { label: 'INFECTED',   color: 'var(--color-green)' },
   eliminated: { label: 'ELIMINATED', color: 'var(--color-red)' },
+  ghost:      { label: 'GHOST',      color: 'rgba(180,180,255,0.5)' },
 }
 
 export default function PlayerStatusBadge({ status, size = 'sm' }: PlayerStatusBadgeProps) {
