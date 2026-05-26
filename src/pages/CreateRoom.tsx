@@ -8,8 +8,8 @@ import BackButton from '../components/BackButton'
 import { Copy } from 'lucide-react'
 
 function cardDistribution(players: number) {
-  const zombieCount = Math.floor(players / 5)
-  const vaccineCount = Math.floor(players / 4)
+  const zombieCount = Math.min(Math.max(1, Math.floor(players / 5)), players - 1)
+  const vaccineCount = Math.min(Math.max(1, Math.floor(players / 4)), players - zombieCount)
   const shotgunCount = players - zombieCount
   return { zombieCount, vaccineCount, shotgunCount }
 }
@@ -79,11 +79,8 @@ export default function CreateRoom() {
   const [roomName, setRoomName] = useState(`${username}'s Room`)
   const [roomNameError, setRoomNameError] = useState('')
   const [maxPlayers, setMaxPlayers] = useState(8)
-  const [timer, setTimer] = useState<number>(20)
-  const [allowSpectators, setAllowSpectators] = useState(true)
-  const [infectionVisibility, setInfectionVisibility] = useState(false)
+  const [timer, setTimer] = useState<number>(60)
   const [visibility, setVisibility] = useState<'public' | 'private'>('public')
-  const [totalRounds, setTotalRounds] = useState<number>(10)
   const [loading, setLoading] = useState(false)
   const [createdCode, setCreatedCode] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
@@ -93,7 +90,7 @@ export default function CreateRoom() {
   function validateRoomName(name: string) {
     if (name.trim().length < 3) return 'Room name must be at least 3 characters'
     if (name.trim().length > 32) return 'Room name must be 32 characters or fewer'
-    if (!/^[a-zA-Z0-9 -]+$/.test(name)) return 'Letters, numbers, spaces and hyphens only'
+    if (!/^[a-zA-Z0-9 _-]+$/.test(name)) return 'Letters, numbers, spaces, underscores and hyphens only'
     return ''
   }
 
@@ -110,7 +107,7 @@ export default function CreateRoom() {
       const { data: room, error: roomErr } = await supabase
         .from('rooms').insert({
           host_id: user!.id, code, status: 'lobby',
-          settings: { room_name: roomName.trim(), max_players: maxPlayers, round_timer_seconds: timer, allow_spectators: allowSpectators, infection_visibility: infectionVisibility, visibility, max_lives: 1, total_rounds: totalRounds },
+          settings: { room_name: roomName.trim(), max_players: maxPlayers, round_timer_seconds: timer, allow_spectators: true, infection_visibility: false, visibility, max_lives: 1, total_rounds: maxPlayers - 1 },
         }).select().single()
       if (roomErr) throw roomErr
 
@@ -166,20 +163,12 @@ export default function CreateRoom() {
               <p style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>↳ {dist.zombieCount} zombie · {dist.vaccineCount} vaccine · {dist.shotgunCount} shotgun cards in play</p>
             </SettingRow>
 
-            <SettingRow label="Action Timer">
-              <SegmentedControl options={[{ label: '10s', value: 10 }, { label: '20s', value: 20 }, { label: '30s', value: 30 }]} value={timer} onChange={v => setTimer(v as number)} />
+            <SettingRow label="Action Timer" sub="Time allowed per round">
+              <SegmentedControl options={[{ label: '1 MIN', value: 60 }, { label: '2 MIN', value: 120 }, { label: '3 MIN', value: 180 }]} value={timer} onChange={v => setTimer(v as number)} />
             </SettingRow>
 
-            <SettingRow label="Ghost Mode" sub="Eliminated players can watch with full intel">
-              <ToggleSwitch value={allowSpectators} onChange={setAllowSpectators} />
-            </SettingRow>
-
-            <SettingRow label="Infection Reveal" sub="Publicly expose infected players after 2 rounds">
-              <ToggleSwitch value={infectionVisibility} onChange={setInfectionVisibility} />
-            </SettingRow>
-
-            <SettingRow label="Total Rounds" sub="Game ends after this many rounds">
-              <SegmentedControl options={[{ label: '5', value: 5 }, { label: '10', value: 10 }, { label: '15', value: 15 }, { label: '20', value: 20 }]} value={totalRounds} onChange={v => setTotalRounds(v as number)} />
+            <SettingRow label="Total Rounds" sub="Auto-set to max players − 1">
+              <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '18px', color: 'var(--color-text)' }}>{maxPlayers - 1}</span>
             </SettingRow>
 
             <div>
@@ -204,7 +193,7 @@ export default function CreateRoom() {
             </div>
 
             <div style={{ marginBottom: '24px' }}>
-              {([['Players', `Up to ${maxPlayers}`], ['Timer', `${timer}s per round`], ['Total Rounds', String(totalRounds)], ['Ghost Mode', allowSpectators ? 'Enabled' : 'Disabled'], ['Infection', infectionVisibility ? 'Reveals after 2 rounds' : 'Secret'], ['Visibility', visibility === 'public' ? 'Public' : 'Private']] as [string, string][]).map(([label, value], i, arr) => (
+              {([['Players', `Up to ${maxPlayers}`], ['Timer', `${timer / 60} min per round`], ['Total Rounds', String(maxPlayers - 1)], ['Visibility', visibility === 'public' ? 'Public' : 'Private']] as [string, string][]).map(([label, value], i, arr) => (
                 <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: i < arr.length - 1 ? '1px dashed var(--color-border)' : 'none' }}>
                   <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontFamily: "'IBM Plex Mono', monospace" }}>{label}</span>
                   <span style={{ fontSize: '11px', color: 'var(--color-text)', fontFamily: "'IBM Plex Mono', monospace" }}>{value}</span>

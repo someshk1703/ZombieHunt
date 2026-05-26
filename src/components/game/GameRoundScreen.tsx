@@ -66,6 +66,8 @@ export default function GameRoundScreen() {
   const [isNegotiating, setIsNegotiating] = useState(true)
   const [chatOpen, setChatOpen] = useState(true)
   const [infectionPayload, setInfectionPayload] = useState<{ infector_username: string; round: number } | null>(null)
+  const [myPairDone, setMyPairDone] = useState(false)
+  const [hasSeenMyResult, setHasSeenMyResult] = useState(false)
   const revealCalledRef = useRef(false)
 
   // Reset local state when round advances
@@ -75,6 +77,8 @@ export default function GameRoundScreen() {
     setOpponentCommitted(false)
     setIsNegotiating(true)
     setChatOpen(true)
+    setMyPairDone(false)
+    setHasSeenMyResult(false)
     revealCalledRef.current = false
   }, [gameState.round_number])
 
@@ -103,7 +107,7 @@ export default function GameRoundScreen() {
           setChatOpen(false)
           showToast('⚡ COMMIT YOUR CARDS NOW', 'info')
           if (isHost) {
-            supabase.from('game_state').update({ phase_deadline: new Date(Date.now() + 25000).toISOString() }).eq('id', gameState.id)
+            supabase.from('game_state').update({ phase_deadline: new Date(Date.now() + 30000).toISOString() }).eq('id', gameState.id)
           }
         } else if (!committed) {
           autoCommit()
@@ -118,6 +122,56 @@ export default function GameRoundScreen() {
     }, 500)
     return () => clearInterval(interval)
   }, [deadline, isNegotiating, committed])
+
+  // Host: auto-commit cards for bot players when negotiation phase ends
+  useEffect(() => {
+    if (isNegotiating || !isHost) return
+
+    async function autoBotCommit() {
+      // Read fresh state FIRST — never use stale closure value as the base
+      const { data: fresh } = await supabase
+        .from('game_state').select('committed_cards').eq('id', gameState.id).single()
+      const freshCommitted = (fresh?.committed_cards as Record<string, unknown>) ?? {}
+
+      const botPlayers = players.filter(p => p.is_bot && p.status !== 'eliminated')
+      if (botPlayers.length === 0) return
+
+      // Only build commits for bots — never include human keys to avoid overwriting them
+      const newBotCommits: Record<string, unknown> = {}
+      let anyChange = false
+
+      for (const bot of botPlayers) {
+        // Only commit if this bot is paired this round
+        const inPair = (gameState.pairs ?? []).some((pair: string[]) => pair.includes(bot.id))
+        if (!inPair) continue
+        // Skip if already committed (check fresh, not stale closure)
+        if (freshCommitted[bot.user_id]) continue
+
+        const botHand = (bot.hand ?? []) as Card[]
+        const available = botHand.filter(c => !c.used)
+        if (available.length === 0) continue
+
+        // Bot strategy: play lowest number card, fallback to any card
+        const numberCards = available.filter(c => c.type === 'number')
+        const pick = numberCards.length > 0
+          ? numberCards.reduce((min, c) => c.value < min.value ? c : min)
+          : available[Math.floor(Math.random() * available.length)]
+
+        newBotCommits[bot.user_id] = [pick]
+        anyChange = true
+      }
+
+      if (!anyChange) return
+
+      // Merge fresh (latest DB) + only new bot commits — human keys are never in newBotCommits
+      const merged = { ...freshCommitted, ...newBotCommits }
+      await supabase.from('game_state').update({ committed_cards: merged }).eq('id', gameState.id)
+    }
+
+    // Small delay so human commits land first, then bot fills gaps
+    const t = setTimeout(autoBotCommit, 1500)
+    return () => clearTimeout(t)
+  }, [isNegotiating, isHost])
 
   // Check if negotiation deadline passed on mount
   useEffect(() => {
@@ -134,6 +188,41 @@ export default function GameRoundScreen() {
     const cc = gameState.committed_cards as Record<string, unknown>
     setOpponentCommitted(!!cc?.[opponent.user_id])
   }, [gameState.committed_cards, opponent])
+
+  // Show inline duel result when both in MY pair have committed
+  useEffect(() => {
+    if (myPairDone || !opponent) return
+    const cc = gameState.committed_cards as Record<string, unknown>
+    if (cc?.[myPlayer.user_id] && cc?.[opponent.user_id]) {
+      setMyPairDone(true)
+    }
+  }, [gameState.committed_cards, opponent, myPlayer.user_id, myPairDone])
+
+  // When ALL pairs committed, host calls resolve-round directly (skip global reveal phase)
+  useEffect(() => {
+    if (!isHost || revealCalledRef.current) return
+    if (gameState.phase !== 'blind_action') return
+    const cc = gameState.committed_cards as Record<string, unknown>
+    const allPairs = gameState.pairs ?? []
+    if (allPairs.length === 0) return
+    const allCommitted = allPairs.every((pair: string[]) => {
+      const pA = players.find(p => p.id === pair[0])
+      const pB = players.find(p => p.id === pair[1])
+      return pA && pB && cc[pA.user_id] && cc[pB.user_id]
+    })
+    if (allCommitted) {
+      revealCalledRef.current = true
+      // Short delay so players briefly see the inline pair reveal before the phase flips
+      setTimeout(async () => {
+        const { data: { session } } = await supabase.auth.getSession()
+        await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/resolve-round`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+          body: JSON.stringify({ room_id: room.id, round_number: gameState.round_number }),
+        })
+      }, 800)
+    }
+  }, [gameState.committed_cards, gameState.pairs, gameState.phase, isHost, players, room.id, gameState.round_number])
 
   // Subscribe to private infection channel
   useEffect(() => {
@@ -260,16 +349,34 @@ export default function GameRoundScreen() {
             {isNegotiating ? 'NEGOTIATION' : committed ? 'WAITING' : 'COMMIT CARDS'}
           </span>
         </div>
-        <motion.span
-          animate={timeLeft <= 5 ? { scale: [1, 1.05, 1] } : {}}
-          transition={{ repeat: Infinity, duration: 0.6 }}
-        >
-          <TimerDisplay
-            deadline={deadline ?? null}
-            totalSeconds={isNegotiating ? 120 : 25}
-            size="md"
-          />
-        </motion.span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {isNegotiating && (
+            <button
+              onClick={async () => {
+                await supabase.from('game_state').update({
+                  negotiation_deadline: new Date(Date.now() - 1000).toISOString(),
+                }).eq('id', gameState.id)
+              }}
+              style={{
+                fontFamily: "'IBM Plex Mono', monospace", fontSize: '9px', letterSpacing: '0.1em',
+                background: 'transparent', border: '1px solid var(--color-text-muted)',
+                color: 'var(--color-text-muted)', padding: '3px 10px', cursor: 'pointer',
+              }}
+            >
+              SKIP ›
+            </button>
+          )}
+          <motion.span
+            animate={timeLeft <= 5 ? { scale: [1, 1.05, 1] } : {}}
+            transition={{ repeat: Infinity, duration: 0.6 }}
+          >
+            <TimerDisplay
+              deadline={deadline ?? null}
+              totalSeconds={isNegotiating ? (room.settings.round_timer_seconds ?? 120) : 30}
+              size="md"
+            />
+          </motion.span>
+        </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
             <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: infectionStatus ? 'var(--color-green)' : 'var(--color-text-muted)', ...(infectionStatus ? { boxShadow: '0 0 6px var(--color-green)', animation: 'pulse 1s infinite' } : {}) }} />
@@ -471,8 +578,139 @@ export default function GameRoundScreen() {
       />
     </div>
     <DragOverlay dropAnimation={null}>
-      {draggedCard ? <CardFace card={draggedCard} size="sm" style={{ opacity: 0.85, boxShadow: '0 8px 24px rgba(0,0,0,0.8)' }} /> : null}
+      {draggedCard ? <CardFace card={draggedCard} size="md" style={{ opacity: 0.85, boxShadow: '0 8px 24px rgba(0,0,0,0.8)' }} /> : null}
     </DragOverlay>
+
+    {/* ── INLINE PAIR REVEAL OVERLAY ─────────────────────────────── */}
+    <AnimatePresence>
+      {myPairDone && !hasSeenMyResult && opponent && (() => {
+        const cc = gameState.committed_cards as Record<string, unknown>
+        // commit_cards RPC stores cards as a JSON string inside the JSONB column — parse if needed
+        function parseCards(val: unknown): Card[] {
+          if (!val) return []
+          if (typeof val === 'string') { try { return JSON.parse(val) } catch { return [] } }
+          if (Array.isArray(val)) return val as Card[]
+          return []
+        }
+        const myCards: Card[] = parseCards(cc[myPlayer.user_id])
+        const oppCards: Card[] = parseCards(cc[opponent.user_id])
+        const myTotal = myCards.filter(c => c.type === 'number').reduce((s, c) => s + c.value, 0)
+        const oppTotal = oppCards.filter(c => c.type === 'number').reduce((s, c) => s + c.value, 0)
+        const mySpecial = myCards.find(c => c.type !== 'number')
+        const oppSpecial = oppCards.find(c => c.type !== 'number')
+        // Rough client-side outcome (server resolve-round is authoritative)
+        let eventLabel = 'NUMERIC'
+        let winnerLabel = myTotal > oppTotal ? 'YOU WIN' : myTotal < oppTotal ? `${opponent.username} WINS` : 'DRAW'
+        let winnerColor = myTotal > oppTotal ? 'var(--color-green)' : myTotal < oppTotal ? 'var(--color-red)' : 'var(--color-text-muted)'
+        if (mySpecial?.type === 'zombie' && oppSpecial?.type !== 'vaccine') {
+          eventLabel = 'ZOMBIE ATTACK'; winnerLabel = 'YOU INFECT'; winnerColor = 'var(--color-green)'
+        } else if (oppSpecial?.type === 'zombie' && mySpecial?.type !== 'vaccine') {
+          eventLabel = 'ZOMBIE ATTACK'; winnerLabel = 'YOU\'RE INFECTED'; winnerColor = '#ff4444'
+        } else if (mySpecial?.type === 'shotgun') {
+          eventLabel = 'SHOTGUN'; winnerLabel = myPlayer.status === 'infected' ? 'ELIMINATED' : 'SHOTGUN FIRED'; winnerColor = 'var(--color-warning)'
+        } else if (oppSpecial?.type === 'shotgun') {
+          eventLabel = 'SHOTGUN'; winnerLabel = 'SHOT AT YOU'; winnerColor = 'var(--color-warning)'
+        }
+        return (
+          <motion.div
+            key="pair-reveal"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            style={{
+              position: 'fixed', inset: 0, zIndex: 100,
+              background: 'rgba(0,0,0,0.92)',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+              gap: '24px', padding: '24px',
+            }}
+          >
+            {/* Event badge */}
+            <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '10px', letterSpacing: '0.3em', color: 'var(--color-text-muted)' }}>
+              ROUND {gameState.round_number} — {eventLabel}
+            </div>
+
+            {/* Players row */}
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '32px' }}>
+              {/* ME */}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', minWidth: '120px' }}>
+                <img src={myPlayer.avatar_url} alt="You" style={{ width: '56px', height: '56px', borderRadius: '50%', border: '2px solid var(--color-red)' }} />
+                <div style={{ fontFamily: "'Bebas Neue', cursive", fontSize: '14px', color: 'var(--color-text)' }}>YOU</div>
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                  {myCards.map(c => <CardFace key={c.id} card={c} size="sm" />)}
+                </div>
+                {myCards.some(c => c.type === 'number') && (
+                  <div style={{ fontFamily: "'Bebas Neue', cursive", fontSize: '18px', color: 'var(--color-text)' }}>{myTotal}</div>
+                )}
+              </div>
+
+              {/* VS */}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px', paddingTop: '24px' }}>
+                <div style={{ fontFamily: "'Bebas Neue', cursive", fontSize: '32px', color: 'var(--color-red)' }}>VS</div>
+                <div style={{ fontFamily: "'Bebas Neue', cursive", fontSize: '20px', color: winnerColor }}>{winnerLabel}</div>
+              </div>
+
+              {/* OPPONENT */}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', minWidth: '120px' }}>
+                <img src={opponent.avatar_url} alt={opponent.username} style={{ width: '56px', height: '56px', borderRadius: '50%', border: '2px solid var(--color-text-muted)' }} />
+                <div style={{ fontFamily: "'Bebas Neue', cursive", fontSize: '14px', color: 'var(--color-text)' }}>{opponent.username}</div>
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                  {oppCards.map(c => <CardFace key={c.id} card={c} size="sm" />)}
+                </div>
+                {oppCards.some(c => c.type === 'number') && (
+                  <div style={{ fontFamily: "'Bebas Neue', cursive", fontSize: '18px', color: 'var(--color-text)' }}>{oppTotal}</div>
+                )}
+              </div>
+            </div>
+
+            {/* Continue button */}
+            <motion.button
+              whileHover={{ scale: 1.04 }}
+              whileTap={{ scale: 0.97 }}
+              onClick={() => setHasSeenMyResult(true)}
+              style={{
+                marginTop: '8px', padding: '10px 40px',
+                fontFamily: "'Bebas Neue', cursive", fontSize: '18px', letterSpacing: '0.1em',
+                background: 'var(--color-red)', border: 'none', color: '#fff', cursor: 'pointer',
+              }}
+            >
+              CONTINUE →
+            </motion.button>
+            <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '9px', color: 'var(--color-text-muted)', letterSpacing: '0.1em' }}>
+              Waiting for other duels to finish...
+            </div>
+          </motion.div>
+        )
+      })()}
+    </AnimatePresence>
+
+    {/* ── WAITING FOR DISCUSSION (after seeing own result) ───────── */}
+    <AnimatePresence>
+      {hasSeenMyResult && gameState.phase === 'blind_action' && (
+        <motion.div
+          key="waiting-discussion"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 99,
+            background: 'rgba(0,0,0,0.85)',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '16px',
+          }}
+        >
+          <motion.span
+            animate={{ opacity: [1, 0.3, 1] }}
+            transition={{ repeat: Infinity, duration: 1.2 }}
+            style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '12px', color: 'var(--color-text-muted)', letterSpacing: '0.25em' }}
+          >
+            WAITING FOR OTHER DUELS...
+          </motion.span>
+          <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '10px', color: 'var(--color-text-muted)', opacity: 0.5 }}>
+            Round {gameState.round_number} — Discussion begins soon
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+
     </DndContext>
   )
 }

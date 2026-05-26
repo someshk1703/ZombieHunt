@@ -21,21 +21,30 @@ interface DuelChatProps {
 }
 
 export default function DuelChat({ isOpen, onToggle, opponent, isNegotiating, myPair }: DuelChatProps) {
-  const { gameState, myPlayer, room } = useGame()
+  const { gameState, myPlayer, room, players } = useGame()
   const { user } = useGameStore()
   const [messages, setMessages] = useState<DuelChatMessage[]>([])
   const [input, setInput] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
 
+  // Resolve opponent from prop, falling back to looking it up from the players list
+  // using myPair (which contains player PKs). This handles cases where the prop
+  // arrives as null due to async player loading.
+  const resolvedOpponent = opponent ?? (() => {
+    if (!myPair) return null
+    const opponentPlayerId = myPair[0] === myPlayer.id ? myPair[1] : myPair[0]
+    return players.find(p => p.id === opponentPlayerId) ?? null
+  })()
+
   const myUserId = myPlayer.user_id
-  const opponentUserId = opponent?.user_id ?? null
+  const opponentUserId = resolvedOpponent?.user_id ?? null
 
   const playerAId = myUserId < (opponentUserId ?? '') ? myUserId : opponentUserId
   const playerBId = myUserId > (opponentUserId ?? '') ? myUserId : opponentUserId
 
   // Load messages
   useEffect(() => {
-    if (!myPair || !opponent) return
+    if (!myPair || !resolvedOpponent) return
     supabase.from('duel_chat')
       .select('*')
       .eq('room_id', room.id)
@@ -44,25 +53,25 @@ export default function DuelChat({ isOpen, onToggle, opponent, isNegotiating, my
       .in('player_b_id', [playerAId, playerBId])
       .order('created_at', { ascending: true })
       .then(({ data }) => { if (data) setMessages(data as DuelChatMessage[]) })
-  }, [room.id, gameState.round_number, myPair, opponent])
+  }, [room.id, gameState.round_number, myPair, resolvedOpponent])
 
   // Realtime subscription
   useEffect(() => {
-    if (!myPair || !opponent) return
+    if (!myPair || !resolvedOpponent) return
     const ch = supabase.channel(`duel-chat-${room.id}-${gameState.round_number}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'duel_chat', filter: `room_id=eq.${room.id}` }, payload => {
         setMessages(prev => [...prev, payload.new as DuelChatMessage])
       })
       .subscribe()
     return () => { supabase.removeChannel(ch) }
-  }, [room.id, gameState.round_number, myPair, opponent])
+  }, [room.id, gameState.round_number, myPair, resolvedOpponent])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
   async function sendMessage() {
-    if (!input.trim() || !opponent || !user) return
+    if (!input.trim() || !resolvedOpponent || !user) return
     const msg = input.slice(0, 160)
     setInput('')
     await supabase.from('duel_chat').insert({
@@ -100,7 +109,7 @@ export default function DuelChat({ isOpen, onToggle, opponent, isNegotiating, my
               <button onClick={onToggle} style={{ background: 'none', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', fontSize: '14px' }}>✕</button>
             </div>
             <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '10px', color: 'var(--color-text-muted)' }}>
-              vs {opponent?.username ?? '—'}
+              vs {resolvedOpponent?.username ?? '—'}
             </div>
             <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '9px', color: phaseColor, marginTop: '2px' }}>
               {isNegotiating ? 'NEGOTIATION' : 'ACTION'}

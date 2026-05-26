@@ -13,12 +13,30 @@ interface PlayerRow {
   status: 'alive' | 'infected' | 'eliminated'
   is_host: boolean
   is_bot: boolean
+  elimination_round: number | null
+  elimination_cause: string | null
+}
+
+interface RoundOutcome {
+  playerA_id: string
+  playerB_id: string
+  winner_id: string | null
+  event: 'numeric' | 'infection' | 'elimination' | 'draw' | 'vaccine_cure'
+  stolenCard?: unknown
+  infectorId?: string
+  curedId?: string
+}
+
+interface RoundLogEntry {
+  round_number: number
+  outcomes: RoundOutcome[]
+}
+
+interface PlayerStats {
   rounds_survived: number
   cards_stolen: number
   infections_caused: number
   special_cards_played: number
-  elimination_round: number | null
-  elimination_cause: string | null
 }
 
 interface GameEvent {
@@ -63,15 +81,54 @@ const dotColors: Record<string, string> = {
   game_end: 'var(--color-text)',
 }
 
-function sortPlayers(players: PlayerRow[], winnerPlayerId: string | null): PlayerRow[] {
+function sortPlayers(players: PlayerRow[], winnerPlayerId: string | null, stats: Record<string, PlayerStats>): PlayerRow[] {
   return [...players].sort((a, b) => {
     if (a.id === winnerPlayerId) return -1
     if (b.id === winnerPlayerId) return 1
     if (a.status !== 'eliminated' && b.status === 'eliminated') return -1
     if (a.status === 'eliminated' && b.status !== 'eliminated') return 1
-    if (a.status !== 'eliminated' && b.status !== 'eliminated') return b.rounds_survived - a.rounds_survived
+    if (a.status !== 'eliminated' && b.status !== 'eliminated') return (stats[b.id]?.rounds_survived ?? 0) - (stats[a.id]?.rounds_survived ?? 0)
     return (b.elimination_round ?? 0) - (a.elimination_round ?? 0)
   })
+}
+
+function computeStats(roundLogs: RoundLogEntry[]): Record<string, PlayerStats> {
+  const map: Record<string, PlayerStats> = {}
+  const ensure = (id: string) => { if (!map[id]) map[id] = { rounds_survived: 0, cards_stolen: 0, infections_caused: 0, special_cards_played: 0 } }
+
+  for (const log of roundLogs) {
+    for (const o of log.outcomes) {
+      ensure(o.playerA_id)
+      ensure(o.playerB_id)
+      // Both participants survived this round (even losers who weren't eliminated)
+      if (o.event !== 'elimination') {
+        map[o.playerA_id].rounds_survived++
+        map[o.playerB_id].rounds_survived++
+      } else {
+        // Only the winner survived; eliminated player did not
+        if (o.winner_id) {
+          ensure(o.winner_id)
+          map[o.winner_id].rounds_survived++
+        }
+      }
+      // Card stealing
+      if (o.stolenCard && o.winner_id) {
+        ensure(o.winner_id)
+        map[o.winner_id].cards_stolen++
+      }
+      // Infections caused
+      if (o.event === 'infection' && o.infectorId) {
+        ensure(o.infectorId)
+        map[o.infectorId].infections_caused++
+      }
+      // Special cards played: any non-numeric event means at least one special card was used
+      if (o.event === 'infection' || o.event === 'elimination') {
+        map[o.playerA_id].special_cards_played++
+        map[o.playerB_id].special_cards_played++
+      }
+    }
+  }
+  return map
 }
 
 export default function Results() {
@@ -81,6 +138,8 @@ export default function Results() {
   const [players, setPlayers] = useState<PlayerRow[]>([])
   const [gameState, setGameState] = useState<GameStateResult | null>(null)
   const [events, setEvents] = useState<GameEvent[]>([])
+  const [roundLogs, setRoundLogs] = useState<RoundLogEntry[]>([])
+  const [stats, setStats] = useState<Record<string, PlayerStats>>({})
   const [tab, setTab] = useState<Tab>('scoreboard')
   const [loading, setLoading] = useState(true)
 
@@ -90,15 +149,24 @@ export default function Results() {
       const { data: room } = await supabase.from('rooms').select('*').eq('code', code!.toUpperCase()).single()
       if (!room) { navigate('/'); return }
 
-      const [{ data: ps }, { data: gs }, { data: evs }] = await Promise.all([
+      const [{ data: ps }, { data: gs }, { data: evs }, { data: logs }] = await Promise.all([
         supabase.from('players').select('*').eq('room_id', room.id),
         supabase.from('game_state').select('round_number,winner_faction,winner_player_id').eq('room_id', room.id).single(),
         supabase.from('game_events').select('*').eq('room_id', room.id).order('created_at', { ascending: true }),
+        supabase.from('round_log').select('round_number,outcomes').eq('room_id', room.id).order('round_number', { ascending: true }),
       ])
 
       if (ps) setPlayers(ps as PlayerRow[])
       if (gs) setGameState(gs as GameStateResult)
       if (evs) setEvents(evs as GameEvent[])
+      if (logs) {
+        const parsed: RoundLogEntry[] = (logs as { round_number: number; outcomes: unknown }[]).map(l => ({
+          round_number: l.round_number,
+          outcomes: (typeof l.outcomes === 'string' ? JSON.parse(l.outcomes) : l.outcomes) as RoundOutcome[],
+        }))
+        setRoundLogs(parsed)
+        setStats(computeStats(parsed))
+      }
       setLoading(false)
     }
     load()
@@ -115,7 +183,7 @@ export default function Results() {
   const winnerFaction = gameState?.winner_faction
   const winnerPlayerId = gameState?.winner_player_id ?? null
   const winner = players.find(p => p.id === winnerPlayerId)
-  const sorted = sortPlayers(players.filter(p => !p.is_bot), winnerPlayerId)
+  const sorted = sortPlayers(players.filter(p => !p.is_bot), winnerPlayerId, stats)
 
   const factionColor = winnerFaction === 'humans' ? '#4499ff' : 'var(--color-green)'
   const factionText = winnerFaction === 'humans' ? 'HUMANITY PREVAILS' : 'THE DEAD WALK'
@@ -165,7 +233,7 @@ export default function Results() {
                     <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '9px', padding: '2px 6px', border: `1px solid ${factionColor}`, color: factionColor }}>WINNER</span>
                   </div>
                   <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '4px' }}>
-                    {winner.rounds_survived} rounds · {winner.cards_stolen} stolen · {winner.infections_caused} infected
+                    {stats[winner.id]?.rounds_survived ?? 0} rounds · {stats[winner.id]?.cards_stolen ?? 0} stolen · {stats[winner.id]?.infections_caused ?? 0} infected
                   </div>
                 </div>
               </div>
@@ -199,10 +267,10 @@ export default function Results() {
                   }}>
                     {isWinner ? 'WINNER' : p.status.toUpperCase()}
                   </span>
-                  <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '12px', color: 'var(--color-text)' }}>{p.rounds_survived}</span>
-                  <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '12px', color: 'var(--color-text)' }}>{p.cards_stolen}</span>
-                  <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '12px', color: p.infections_caused > 0 ? 'var(--color-green)' : 'var(--color-text-muted)' }}>{p.infections_caused}</span>
-                  <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '12px', color: p.special_cards_played > 0 ? 'var(--color-warning)' : 'var(--color-text-muted)' }}>{p.special_cards_played}</span>
+                  <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '12px', color: 'var(--color-text)' }}>{stats[p.id]?.rounds_survived ?? 0}</span>
+                  <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '12px', color: 'var(--color-text)' }}>{stats[p.id]?.cards_stolen ?? 0}</span>
+                  <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '12px', color: (stats[p.id]?.infections_caused ?? 0) > 0 ? 'var(--color-green)' : 'var(--color-text-muted)' }}>{stats[p.id]?.infections_caused ?? 0}</span>
+                  <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '12px', color: (stats[p.id]?.special_cards_played ?? 0) > 0 ? 'var(--color-warning)' : 'var(--color-text-muted)' }}>{stats[p.id]?.special_cards_played ?? 0}</span>
                 </div>
               )
             })}
@@ -210,41 +278,94 @@ export default function Results() {
         )}
 
         {/* GAME STORY TAB */}
-        {tab === 'story' && (
-          <div style={{ position: 'relative', paddingLeft: '24px', borderLeft: '1px solid var(--color-border)' }}>
-            {events.length === 0 ? (
-              <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '12px', color: 'var(--color-text-muted)', fontStyle: 'italic', padding: '24px 0' }}>No events recorded.</div>
-            ) : (
-              events.map((ev, i) => (
-                <motion.div
-                  key={ev.id}
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: i * 0.05 }}
-                  style={{ position: 'relative', marginBottom: '16px', paddingLeft: '16px' }}
-                >
-                  {/* Dot */}
-                  <div style={{
-                    position: 'absolute', left: '-28px', top: '4px',
-                    width: '8px', height: '8px', borderRadius: '50%',
-                    background: dotColors[ev.event_type] ?? 'var(--color-text-muted)',
-                  }} />
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
-                    <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '9px', color: 'var(--color-text-muted)', background: 'var(--color-surface)', padding: '2px 6px' }}>
-                      R{ev.round_number}
+        {tab === 'story' && (() => {
+          const playerMap: Record<string, string> = {}
+          for (const p of players) playerMap[p.id] = p.username
+
+          interface StoryLine { round: number; text: string; color: string }
+          const storyLines: StoryLine[] = []
+          for (const log of roundLogs) {
+            for (const o of log.outcomes) {
+              const a = playerMap[o.playerA_id] ?? 'Unknown'
+              const b = playerMap[o.playerB_id] ?? 'Unknown'
+              const winnerName = o.winner_id ? (playerMap[o.winner_id] ?? 'Unknown') : null
+              const loserName = winnerName ? (winnerName === a ? b : a) : null
+              if (o.event === 'infection') {
+                const infectorName = o.infectorId ? (playerMap[o.infectorId] ?? 'Unknown') : (winnerName ?? a)
+                const infectedName = infectorName === a ? b : a
+                storyLines.push({ round: log.round_number, text: `${infectorName} played a zombie card, infecting ${infectedName}`, color: 'var(--color-green)' })
+              } else if (o.event === 'vaccine_cure') {
+                const curedName = o.curedId ? (playerMap[o.curedId] ?? 'Unknown') : (winnerName === a ? b : a)
+                const healer = winnerName ?? a
+                storyLines.push({ round: log.round_number, text: `${healer} administered a vaccine, curing ${curedName}`, color: '#4499ff' })
+              } else if (o.event === 'elimination') {
+                storyLines.push({ round: log.round_number, text: `${winnerName} fired a shotgun, eliminating ${loserName}`, color: 'var(--color-red)' })
+              } else if (o.event === 'draw') {
+                storyLines.push({ round: log.round_number, text: `${a} and ${b} played equally — no winner`, color: 'var(--color-text-muted)' })
+              } else {
+                const stolen = o.stolenCard ? ' and stole a card' : ''
+                const msg = winnerName ? `${winnerName} outplayed ${loserName} in a card duel${stolen}` : `${a} and ${b} clashed${stolen}`
+                storyLines.push({ round: log.round_number, text: msg, color: 'var(--color-warning)' })
+              }
+            }
+          }
+
+          // Closing line
+          const closingText = winnerFaction === 'humans'
+            ? 'The zombie threat has been neutralized. Humanity survives.'
+            : winnerFaction === 'zombies'
+            ? 'The infected have overwhelmed the survivors. The dead walk the earth.'
+            : 'The conflict ends — no faction claimed total victory.'
+
+          return (
+            <div style={{ position: 'relative', paddingLeft: '24px', borderLeft: '1px solid var(--color-border)' }}>
+              {storyLines.length === 0 ? (
+                <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '12px', color: 'var(--color-text-muted)', fontStyle: 'italic', padding: '24px 0' }}>No round data recorded yet.</div>
+              ) : (
+                <>
+                  {storyLines.map((line, i) => (
+                    <motion.div
+                      key={i}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: i * 0.04 }}
+                      style={{ position: 'relative', marginBottom: '14px', paddingLeft: '16px' }}
+                    >
+                      <div style={{
+                        position: 'absolute', left: '-28px', top: '5px',
+                        width: '8px', height: '8px', borderRadius: '50%',
+                        background: line.color,
+                      }} />
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '9px', color: 'var(--color-text-muted)', background: 'var(--color-surface)', padding: '2px 6px', flexShrink: 0 }}>
+                          R{line.round}
+                        </span>
+                        <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '12px', color: 'var(--color-text)' }}>
+                          {line.text}
+                        </span>
+                      </div>
+                    </motion.div>
+                  ))}
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: storyLines.length * 0.04 + 0.2 }}
+                    style={{ position: 'relative', marginTop: '24px', paddingLeft: '16px', paddingTop: '16px', borderTop: '1px solid var(--color-border)' }}
+                  >
+                    <div style={{
+                      position: 'absolute', left: '-28px', top: '20px',
+                      width: '8px', height: '8px', borderRadius: '50%',
+                      background: factionColor,
+                    }} />
+                    <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '13px', color: factionColor, fontStyle: 'italic' }}>
+                      {closingText}
                     </span>
-                    <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '12px', color: 'var(--color-text)' }}>
-                      {formatEvent(ev)}
-                    </span>
-                  </div>
-                  <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '9px', color: 'var(--color-text-muted)' }}>
-                    {new Date(ev.created_at).toLocaleTimeString()}
-                  </div>
-                </motion.div>
-              ))
-            )}
-          </div>
-        )}
+                  </motion.div>
+                </>
+              )}
+            </div>
+          )
+        })()}
 
         {/* Bottom actions */}
         <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', marginTop: '48px' }}>
