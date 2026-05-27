@@ -59,8 +59,8 @@ class AudioManager {
     return src
   }
 
-  private distortionCurve(amount: number): Float32Array {
-    const n = 256; const curve = new Float32Array(n)
+  private distortionCurve(amount: number): Float32Array<ArrayBuffer> {
+    const n = 256; const curve = new Float32Array(new ArrayBuffer(n * 4))
     for (let i = 0; i < n; i++) {
       const x = (i * 2) / n - 1
       curve[i] = ((Math.PI + amount) * x) / (Math.PI + amount * Math.abs(x))
