@@ -354,14 +354,6 @@ Deno.serve(async (req: Request) => {
         updateB.infection_rounds = 1
         updateB.infector_id = outcome.infectorId
       }
-      const infectedPlayer = outcome.infectedId === pA.id ? pA : pB
-      const infectorPlayer = outcome.infectorId === pA.id ? pA : pB
-      try {
-        await supabase.channel(`private:${infectedPlayer.user_id}`).send({
-          type: 'broadcast', event: 'infected',
-          payload: { infector_username: infectorPlayer.username, round: round_number }
-        })
-      } catch (_e) { console.warn('Broadcast failed:', _e) }
     }
 
     // --- ELIMINATION (shotgun on infected player) ---
@@ -410,6 +402,18 @@ Deno.serve(async (req: Request) => {
     // --- SAVE: single atomic update per player ---
     await supabase.from('players').update({ hand: newHandA, ...updateA }).eq('id', pA.id)
     await supabase.from('players').update({ hand: newHandB, ...updateB }).eq('id', pB.id)
+
+    // Broadcast infection AFTER DB updates so client hand is already written when alert fires
+    if (outcome.event === 'infection' && outcome.infectedId && outcome.infectorId) {
+      const infectedPlayer = outcome.infectedId === pA.id ? pA : pB
+      const infectorPlayer = outcome.infectorId === pA.id ? pA : pB
+      try {
+        await supabase.channel(`private:${infectedPlayer.user_id}`).send({
+          type: 'broadcast', event: 'infected',
+          payload: { infector_username: infectorPlayer.username, round: round_number }
+        })
+      } catch (_e) { console.warn('Broadcast failed:', _e) }
+    }
   }
 
   const { data: infectedPlayers } = await supabase.from('players').select('*').eq('room_id', room_id).eq('status', 'infected')
@@ -421,7 +425,8 @@ Deno.serve(async (req: Request) => {
     await supabase.from('players').update({ infection_rounds: newRounds }).eq('id', ip.id)
   }
 
-  await supabase.from('round_log').insert({ room_id, round_number, outcomes: JSON.stringify(outcomes) })
+  const { error: logErr } = await supabase.from('round_log').insert({ room_id, round_number, outcomes })
+  if (logErr) console.error('round_log insert failed:', logErr.message, logErr.details, logErr.hint)
 
   // Eliminate players whose hand has no number cards left (only specials = cannot duel)
   const { data: marginalPlayers } = await supabase.from('players').select('id, hand')

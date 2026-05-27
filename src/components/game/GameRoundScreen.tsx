@@ -55,7 +55,7 @@ function DroppableSlot({ id, card, onRemove, committed }: { id: string; card: Ca
 }
 
 export default function GameRoundScreen() {
-  const { gameState, myPlayer, players, room, isHost, myHand } = useGame()
+  const { gameState, myPlayer, players, room, isHost, myHand, setMyHand, refreshPlayers } = useGame()
   const { user } = useGameStore()
   const { showToast } = useToast()
 
@@ -325,7 +325,13 @@ export default function GameRoundScreen() {
       {/* Infection alert */}
       <AnimatePresence>
         {infectionPayload && (
-          <InfectionAlert payload={infectionPayload} onDone={() => setInfectionPayload(null)} />
+          <InfectionAlert payload={infectionPayload} onDone={async () => {
+            setInfectionPayload(null)
+            // Re-fetch own hand in case realtime missed the update
+            const { data } = await supabase.from('players').select('hand,status').eq('id', myPlayer.id).single()
+            if (data?.hand) setMyHand(data.hand as Card[])
+            await refreshPlayers()
+          }} />
         )}
       </AnimatePresence>
 
@@ -594,15 +600,26 @@ export default function GameRoundScreen() {
         const mySpecial = myCards.find(c => c.type !== 'number')
         const oppSpecial = oppCards.find(c => c.type !== 'number')
         // Rough client-side outcome (server resolve-round is authoritative)
+        // Priority matches server: 1=shotgun on infected, 2=zombie attack, 3=vaccine cure, 4=numeric
         let eventLabel = 'NUMERIC'
         let winnerLabel = myTotal > oppTotal ? 'YOU WIN' : myTotal < oppTotal ? `${opponent.username} WINS` : 'DRAW'
         let winnerColor = myTotal > oppTotal ? 'var(--color-green)' : myTotal < oppTotal ? 'var(--color-red)' : 'var(--color-text-muted)'
-        if (mySpecial?.type === 'zombie' && oppSpecial?.type !== 'vaccine') {
+        if (mySpecial?.type === 'shotgun' && opponent.status === 'infected') {
+          // Shotgun eliminates infected opponent (priority 1 — same as server)
+          eventLabel = 'SHOTGUN'; winnerLabel = 'INFECTED ELIMINATED'; winnerColor = 'var(--color-warning)'
+        } else if (oppSpecial?.type === 'shotgun' && myPlayer.status === 'infected') {
+          // Opponent's shotgun eliminates me (infected)
+          eventLabel = 'SHOTGUN'; winnerLabel = 'YOU WERE ELIMINATED'; winnerColor = '#ff4444'
+        } else if (mySpecial?.type === 'zombie' && oppSpecial?.type !== 'vaccine' && oppSpecial?.type !== 'shotgun') {
           eventLabel = 'ZOMBIE ATTACK'; winnerLabel = 'YOU INFECT'; winnerColor = 'var(--color-green)'
-        } else if (oppSpecial?.type === 'zombie' && mySpecial?.type !== 'vaccine') {
+        } else if (oppSpecial?.type === 'zombie' && mySpecial?.type !== 'vaccine' && mySpecial?.type !== 'shotgun') {
           eventLabel = 'ZOMBIE ATTACK'; winnerLabel = 'YOU\'RE INFECTED'; winnerColor = '#ff4444'
+        } else if (mySpecial?.type === 'vaccine' && opponent.status === 'infected') {
+          eventLabel = 'VACCINE'; winnerLabel = 'OPPONENT CURED'; winnerColor = '#4499ff'
+        } else if (oppSpecial?.type === 'vaccine' && myPlayer.status === 'infected') {
+          eventLabel = 'VACCINE'; winnerLabel = 'YOU ARE CURED'; winnerColor = '#4499ff'
         } else if (mySpecial?.type === 'shotgun') {
-          eventLabel = 'SHOTGUN'; winnerLabel = myPlayer.status === 'infected' ? 'ELIMINATED' : 'SHOTGUN FIRED'; winnerColor = 'var(--color-warning)'
+          eventLabel = 'SHOTGUN'; winnerLabel = 'SHOTGUN FIRED'; winnerColor = 'var(--color-warning)'
         } else if (oppSpecial?.type === 'shotgun') {
           eventLabel = 'SHOTGUN'; winnerLabel = 'SHOT AT YOU'; winnerColor = 'var(--color-warning)'
         }
