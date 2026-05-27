@@ -31,7 +31,6 @@ interface PairOutcome {
   event: 'numeric' | 'infection' | 'elimination' | 'draw' | 'vaccine_cure'
   totalA: number
   totalB: number
-  stolenCard?: Card
   eliminatedId?: string
   infectedId?: string
   infectorId?: string
@@ -133,50 +132,132 @@ function resolveSpecialCards(cardsA: Card[], cardsB: Card[], pA: Player, pB: Pla
   return resolveNumeric(cardsA, cardsB, pA, pB)
 }
 
-/**
- * Give the newly infected player a zombie card.
- * If their current hand already has 7+ cards, a random number card is replaced.
- * Otherwise the zombie card is simply appended.
- */
-function buildInfectedHand(hand: Card[]): Card[] {
-  const zombieCard: Card = { id: `zombie-${crypto.randomUUID()}`, type: 'zombie', value: 0, used: false }
-  if (hand.length >= 7) {
-    const numericIndices: number[] = []
-    hand.forEach((c, i) => { if (c.type === 'number') numericIndices.push(i) })
-    if (numericIndices.length > 0) {
-      const removeIdx = numericIndices[Math.floor(Math.random() * numericIndices.length)]
-      return [...hand.slice(0, removeIdx), zombieCard, ...hand.slice(removeIdx + 1)]
-    }
-  }
-  return [...hand, zombieCard]
+function pairKey(aId: string, bId: string): string {
+  return aId < bId ? `${aId}:${bId}` : `${bId}:${aId}`
 }
 
-/**
- * Pair up players for the next round.
- * If the count is odd one player sits out (bye). The bye rotates sequentially
- * through a stable ordering so no player waits two rounds in a row.
- */
-function generatePairs(players: Player[], prevByeId: string | null = null): { pairs: string[][], bye: string | null } {
-  if (players.length % 2 === 0) {
-    // Even — everyone plays
-    const shuffled = [...players].sort(() => Math.random() - 0.5)
-    const pairs: string[][] = []
-    for (let i = 0; i < shuffled.length - 1; i += 2) pairs.push([shuffled[i].id, shuffled[i + 1].id])
-    return { pairs, bye: null }
+function removeOneCardForNumericLoss(hand: Card[], committed: Card[]): Card[] {
+  const committedIds = new Set(committed.map(c => c.id))
+  const committedNumbers = hand.filter(c => committedIds.has(c.id) && c.type === 'number')
+  if (committedNumbers.length > 0) {
+    const removeId = committedNumbers[0].id
+    return hand.filter(c => c.id !== removeId)
   }
-  // Odd — choose next bye player in stable (alphabetical ID) rotation
-  const sorted = [...players].sort((a, b) => a.id.localeCompare(b.id))
-  let byeIdx = 0
-  if (prevByeId) {
-    const prevIdx = sorted.findIndex(p => p.id === prevByeId)
-    if (prevIdx >= 0) byeIdx = (prevIdx + 1) % sorted.length
+  const anyNumber = hand.find(c => c.type === 'number')
+  if (anyNumber) return hand.filter(c => c.id !== anyNumber.id)
+
+  // Fallback: keep zombie identity unless absolutely unavoidable.
+  const nonZombie = hand.find(c => c.type !== 'zombie')
+  if (nonZombie) return hand.filter(c => c.id !== nonZombie.id)
+  return hand
+}
+
+function buildInfectedReplacementHand(hand: Card[], committed: Card[]): Card[] {
+  const zombieCard: Card = { id: `zombie-${crypto.randomUUID()}`, type: 'zombie', value: 0, used: false }
+  const reduced = removeOneCardForNumericLoss(hand, committed)
+  if (reduced.length >= 7) return [...reduced.slice(0, 6), zombieCard]
+  return [...reduced, zombieCard]
+}
+
+function buildPairingsMinRematch(
+  players: Player[],
+  pairCounts: Record<string, number>,
+  lastRoundPairs: Set<string>,
+): { pairs: string[][], bye: string | null } {
+  type PairPlan = { pairs: string[][], score: number }
+
+  function scorePair(aId: string, bId: string): number {
+    const key = pairKey(aId, bId)
+    const repeatCount = pairCounts[key] ?? 0
+    const immediateRematchPenalty = lastRoundPairs.has(key) ? 1000 : 0
+    return repeatCount * 10 + immediateRematchPenalty
   }
-  const byePlayer = sorted[byeIdx]
-  const remaining = players.filter(p => p.id !== byePlayer.id)
-  const shuffled = [...remaining].sort(() => Math.random() - 0.5)
-  const pairs: string[][] = []
-  for (let i = 0; i < shuffled.length - 1; i += 2) pairs.push([shuffled[i].id, shuffled[i + 1].id])
-  return { pairs, bye: byePlayer.id }
+
+  function bestForEven(ids: string[]): PairPlan {
+    if (ids.length === 0) return { pairs: [], score: 0 }
+    const [head, ...rest] = ids
+    let best: PairPlan | null = null
+    for (let i = 0; i < rest.length; i++) {
+      const mate = rest[i]
+      const remaining = rest.filter((_, idx) => idx !== i)
+      const sub = bestForEven(remaining)
+      const totalScore = scorePair(head, mate) + sub.score
+      if (!best || totalScore < best.score) {
+        best = { pairs: [[head, mate], ...sub.pairs], score: totalScore }
+      }
+    }
+    return best ?? { pairs: [], score: Number.MAX_SAFE_INTEGER }
+  }
+
+  const ids = players.map(p => p.id)
+  if (ids.length % 2 === 0) {
+    const best = bestForEven(ids)
+    return { pairs: best.pairs, bye: null }
+  }
+
+  let bestOverall: { pairs: string[][], bye: string, score: number } | null = null
+  for (const byeId of ids) {
+    const remaining = ids.filter(id => id !== byeId)
+    const best = bestForEven(remaining)
+    // Soft preference: avoid giving bye to the same user repeatedly by letting pair score dominate.
+    if (!bestOverall || best.score < bestOverall.score) {
+      bestOverall = { pairs: best.pairs, bye: byeId, score: best.score }
+    }
+  }
+  if (!bestOverall) return { pairs: [], bye: null }
+  return { pairs: bestOverall.pairs, bye: bestOverall.bye }
+}
+
+function buildPairingsNoRepeatUntilExhausted(
+  players: Player[],
+  pairCounts: Record<string, number>,
+  lastRoundPairs: Set<string>,
+  prevByeId: string | null,
+): { pairs: string[][], bye: string | null } {
+  type PairPlan = { pairs: string[][] }
+
+  function canUsePairNoRepeat(aId: string, bId: string): boolean {
+    const key = pairKey(aId, bId)
+    return (pairCounts[key] ?? 0) === 0
+  }
+
+  function findEvenNoRepeat(ids: string[]): PairPlan | null {
+    if (ids.length === 0) return { pairs: [] }
+    const sorted = [...ids].sort((a, b) => a.localeCompare(b))
+    const [head, ...rest] = sorted
+    for (let i = 0; i < rest.length; i++) {
+      const mate = rest[i]
+      if (!canUsePairNoRepeat(head, mate)) continue
+      const remaining = rest.filter((_, idx) => idx !== i)
+      const sub = findEvenNoRepeat(remaining)
+      if (sub) return { pairs: [[head, mate], ...sub.pairs] }
+    }
+    return null
+  }
+
+  const ids = players.map(p => p.id).sort((a, b) => a.localeCompare(b))
+
+  if (ids.length % 2 === 0) {
+    const strictPlan = findEvenNoRepeat(ids)
+    if (strictPlan) return { pairs: strictPlan.pairs, bye: null }
+    return buildPairingsMinRematch(players, pairCounts, lastRoundPairs)
+  }
+
+  const byeCandidates = [...ids]
+  if (prevByeId && byeCandidates.includes(prevByeId)) {
+    // Prefer not to repeat the same bye when we still have options.
+    byeCandidates.splice(byeCandidates.indexOf(prevByeId), 1)
+    byeCandidates.push(prevByeId)
+  }
+
+  for (const byeId of byeCandidates) {
+    const remaining = ids.filter(id => id !== byeId)
+    const strictPlan = findEvenNoRepeat(remaining)
+    if (strictPlan) return { pairs: strictPlan.pairs, bye: byeId }
+  }
+
+  // No full no-repeat solution exists for current alive set, so use best-possible rematch minimization.
+  return buildPairingsMinRematch(players, pairCounts, lastRoundPairs)
 }
 
 Deno.serve(async (req: Request) => {
@@ -233,18 +314,6 @@ Deno.serve(async (req: Request) => {
     const result = resolveSpecialCards(cardsA, cardsB, pA, pB)
     const outcome: PairOutcome = { playerA_id: aId, playerB_id: bId, ...result }
 
-    if ((result.event === 'numeric' || result.event === 'infection') && result.winner_id && result.loser_id) {
-      const loser = players.find(p => p.id === result.loser_id)
-      if (loser) {
-        // Only exclude shotgun/vaccine from stealable pool (zombie stays in hand)
-        const loserCommittedIds = new Set((committedCards[loser.user_id] ?? [])
-          .filter((c: Card) => c.type === 'shotgun' || c.type === 'vaccine')
-          .map((c: Card) => c.id))
-        const available = loser.hand.filter((c: Card) => !c.used && !loserCommittedIds.has(c.id))
-        if (available.length > 0) outcome.stolenCard = available[Math.floor(Math.random() * available.length)]
-      }
-    }
-
     outcomes.push(outcome)
     if (result.eliminatedId) eliminations.push(result.eliminatedId)
     if (result.infectedId) infections.push(result.infectedId)
@@ -274,13 +343,13 @@ Deno.serve(async (req: Request) => {
     // --- INFECTION ---
     if (outcome.event === 'infection' && outcome.infectedId && outcome.infectorId) {
       if (outcome.infectedId === pA.id) {
-        // Replace a number card if already at 7+ cards, otherwise just append
-        newHandA = buildInfectedHand(newHandA)
+        // Strict rule: infected target loses one card and that slot becomes zombie.
+        newHandA = buildInfectedReplacementHand(newHandA, committedA)
         updateA.status = 'infected'
         updateA.infection_rounds = 1
         updateA.infector_id = outcome.infectorId
       } else {
-        newHandB = buildInfectedHand(newHandB)
+        newHandB = buildInfectedReplacementHand(newHandB, committedB)
         updateB.status = 'infected'
         updateB.infection_rounds = 1
         updateB.infector_id = outcome.infectorId
@@ -324,17 +393,19 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // --- CARD STEALING (from non-committed cards in updated hand) ---
-    if (outcome.stolenCard && outcome.winner_id && outcome.loser_id) {
-      const stolenCard = outcome.stolenCard as Card
-      if (outcome.winner_id === pA.id) {
-        newHandB = newHandB.filter((c: Card) => c.id !== stolenCard.id)
-        newHandA = [...newHandA, stolenCard]
-      } else {
-        newHandA = newHandA.filter((c: Card) => c.id !== stolenCard.id)
-        newHandB = [...newHandB, stolenCard]
+    // --- NUMERIC LOSS ---
+    // Strict rule: loser drops one card; winner retains their hand.
+    if (outcome.event === 'numeric' && outcome.loser_id) {
+      if (outcome.loser_id === pA.id) {
+        newHandA = removeOneCardForNumericLoss(newHandA, committedA)
+      } else if (outcome.loser_id === pB.id) {
+        newHandB = removeOneCardForNumericLoss(newHandB, committedB)
       }
     }
+
+    // Safety clamp: hands should never exceed 7 cards.
+    if (newHandA.length > 7) newHandA = newHandA.slice(0, 7)
+    if (newHandB.length > 7) newHandB = newHandB.slice(0, 7)
 
     // --- SAVE: single atomic update per player ---
     await supabase.from('players').update({ hand: newHandA, ...updateA }).eq('id', pA.id)
@@ -343,15 +414,11 @@ Deno.serve(async (req: Request) => {
 
   const { data: infectedPlayers } = await supabase.from('players').select('*').eq('room_id', room_id).eq('status', 'infected')
   for (const ip of infectedPlayers ?? []) {
-    // Skip players infected THIS round — they survive their first infected round
-    // (infection_rounds was just set to 1 by the outcome loop above)
+    // Infected players remain playable until eliminated by shotgun or cured by vaccine.
+    // We only advance infection_rounds metadata for visibility/telemetry.
     if (infections.includes(ip.id)) continue
     const newRounds = (ip.infection_rounds ?? 0) + 1
-    if (newRounds >= 2) {
-      await supabase.from('players').update({ status: 'eliminated', elimination_round: round_number, elimination_cause: 'infection' }).eq('id', ip.id)
-    } else {
-      await supabase.from('players').update({ infection_rounds: newRounds }).eq('id', ip.id)
-    }
+    await supabase.from('players').update({ infection_rounds: newRounds }).eq('id', ip.id)
   }
 
   await supabase.from('round_log').insert({ room_id, round_number, outcomes: JSON.stringify(outcomes) })
@@ -389,7 +456,7 @@ Deno.serve(async (req: Request) => {
   // has ever been infected (e.g. test games where all players start alive).
   // Round_log already has current round inserted, so infection/vaccine_cure/elimination
   // events from this round are included in the scan.
-  const { data: logData } = await supabase.from('round_log').select('outcomes').eq('room_id', room_id)
+  const { data: logData } = await supabase.from('round_log').select('round_number,outcomes').eq('room_id', room_id)
   const zombieEverExisted = zombiesNow.length > 0 || (logData ?? []).some(log => {
     const outs: Array<{ event: string }> = typeof log.outcomes === 'string'
       ? JSON.parse(log.outcomes) : (log.outcomes ?? [])
@@ -441,9 +508,27 @@ Deno.serve(async (req: Request) => {
     })
   }
 
-  // Game continues — generate new pairs and transition to discussion
-  // Pass previous bye_player_id so the bye rotates sequentially
-  const { pairs: newPairs, bye } = generatePairs(realAlive, gs.bye_player_id ?? null)
+  // Build pair history to minimize rematches for next round.
+  const pairCounts: Record<string, number> = {}
+  const lastRoundPairs = new Set<string>()
+  const maxLoggedRound = (logData ?? []).reduce((m, row) => Math.max(m, Number(row.round_number ?? 0)), 0)
+  for (const row of (logData ?? []) as Array<{ round_number?: number; outcomes: unknown }>) {
+    const outs: Array<{ playerA_id: string; playerB_id: string }> = typeof row.outcomes === 'string'
+      ? JSON.parse(row.outcomes) : (row.outcomes as Array<{ playerA_id: string; playerB_id: string }> ?? [])
+    for (const out of outs) {
+      const key = pairKey(out.playerA_id, out.playerB_id)
+      pairCounts[key] = (pairCounts[key] ?? 0) + 1
+      if ((row.round_number ?? 0) === maxLoggedRound) lastRoundPairs.add(key)
+    }
+  }
+
+  // Game continues — generate new pairs and transition to discussion.
+  const { pairs: newPairs, bye } = buildPairingsNoRepeatUntilExhausted(
+    realAlive,
+    pairCounts,
+    lastRoundPairs,
+    gs.bye_player_id ?? null,
+  )
   const finalPairs = [...newPairs]
   // If there's a bye player (odd count), pair them with Subject Zero if it exists
   if (bye) {

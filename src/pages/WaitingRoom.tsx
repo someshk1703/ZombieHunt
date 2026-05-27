@@ -407,7 +407,7 @@ export default function WaitingRoom() {
           }}
         >
           <div>
-            <div style={{ fontFamily: "'Bebas Neue', cursive", fontSize: '11px', color: 'var(--color-red)', letterSpacing: '0.2em', marginBottom: '2px' }}>ZOMBIE HUNT</div>
+            <img src="/assets/zombie_hunt_logo.svg" alt="ZOMBIE HUNT" style={{ width: '90px', height: 'auto', display: 'block', marginBottom: '4px' }} />
             <h1 style={{ fontFamily: "'Bebas Neue', cursive", fontSize: '32px', color: 'var(--color-text)', letterSpacing: '0.05em', lineHeight: 1, margin: 0 }}>
               {room.settings.room_name ?? 'LOBBY'}
             </h1>

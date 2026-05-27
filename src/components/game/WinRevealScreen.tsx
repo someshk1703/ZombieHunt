@@ -26,6 +26,10 @@ export default function WinRevealScreen() {
   const winnerFaction = (gameState as unknown as { winner_faction?: string }).winner_faction
   const winnerPlayerId = (gameState as unknown as { winner_player_id?: string }).winner_player_id
 
+  // Dead Walk case: human faction wins with exactly one surviving human.
+  // We infer this from a concrete human winner id being present.
+  const isDeadWalkCase = winnerFaction === 'humans' && Boolean(winnerPlayerId)
+
   // Phase sequence
   useEffect(() => {
     const t1 = setTimeout(() => setPhase('reveals'), 1000)
@@ -62,8 +66,12 @@ export default function WinRevealScreen() {
 
   const factionBg = winnerFaction === 'humans' ? '#050510' : '#000a00'
   const factionColor = winnerFaction === 'humans' ? '#4499ff' : 'var(--color-green)'
-  const factionText = winnerFaction === 'humans' ? 'HUMANITY SURVIVES' : 'THE INFECTION SPREADS'
-  const factionSub = winnerFaction === 'humans' ? undefined : 'ALL HUMANS HAVE FALLEN'
+  const factionText = winnerFaction === 'humans'
+    ? (isDeadWalkCase ? 'THE DEAD WALK' : 'HUMANITY PREVAILS')
+    : 'ZOMBIES WON'
+  const factionSub = winnerFaction === 'humans'
+    ? (isDeadWalkCase ? 'ONE HUMAN STANDS. NO INFECTED REMAIN.' : undefined)
+    : 'ALL HUMANS HAVE FALLEN'
 
   const currentReveal = revealIndex >= 0 ? revealSequence[revealIndex] : null
   const isWinner = currentReveal?.playerId === winnerPlayerId
