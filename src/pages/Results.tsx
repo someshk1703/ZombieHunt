@@ -22,7 +22,6 @@ interface RoundOutcome {
   playerB_id: string
   winner_id: string | null
   event: 'numeric' | 'infection' | 'elimination' | 'draw' | 'vaccine_cure'
-  stolenCard?: unknown
   infectorId?: string
   curedId?: string
 }
@@ -34,7 +33,6 @@ interface RoundLogEntry {
 
 interface PlayerStats {
   rounds_survived: number
-  cards_stolen: number
   infections_caused: number
   special_cards_played: number
 }
@@ -60,7 +58,7 @@ function sortPlayers(players: PlayerRow[], winnerPlayerId: string | null, stats:
 
 function computeStats(roundLogs: RoundLogEntry[]): Record<string, PlayerStats> {
   const map: Record<string, PlayerStats> = {}
-  const ensure = (id: string) => { if (!map[id]) map[id] = { rounds_survived: 0, cards_stolen: 0, infections_caused: 0, special_cards_played: 0 } }
+  const ensure = (id: string) => { if (!map[id]) map[id] = { rounds_survived: 0, infections_caused: 0, special_cards_played: 0 } }
 
   for (const log of roundLogs) {
     for (const o of log.outcomes) {
@@ -76,11 +74,6 @@ function computeStats(roundLogs: RoundLogEntry[]): Record<string, PlayerStats> {
           ensure(o.winner_id)
           map[o.winner_id].rounds_survived++
         }
-      }
-      // Card stealing
-      if (o.stolenCard && o.winner_id) {
-        ensure(o.winner_id)
-        map[o.winner_id].cards_stolen++
       }
       // Infections caused
       if (o.event === 'infection' && o.infectorId) {
@@ -148,8 +141,15 @@ export default function Results() {
   const winner = players.find(p => p.id === winnerPlayerId)
   const sorted = sortPlayers(players.filter(p => !p.is_bot), winnerPlayerId, stats)
 
+  const aliveNonBots = players.filter(p => !p.is_bot && p.status !== 'eliminated')
+  const aliveHumans = aliveNonBots.filter(p => p.status === 'alive')
+  const aliveZombies = aliveNonBots.filter(p => p.status === 'infected')
+  const isDeadWalkCase = winnerFaction === 'humans' && aliveHumans.length === 1 && aliveZombies.length === 0
+
   const factionColor = winnerFaction === 'humans' ? '#4499ff' : 'var(--color-green)'
-  const factionText = winnerFaction === 'humans' ? 'HUMANITY PREVAILS' : 'THE DEAD WALK'
+  const factionText = winnerFaction === 'humans'
+    ? (isDeadWalkCase ? 'THE DEAD WALK' : 'HUMANITY PREVAILS')
+    : 'ZOMBIES WON'
   const factionBg = winnerFaction === 'humans' ? 'rgba(0,0,40,0.8)' : 'rgba(0,20,0,0.8)'
 
   return (
@@ -157,6 +157,9 @@ export default function Results() {
       <AtmosphericBackground />
       <div style={{ position: 'relative', zIndex: 1, maxWidth: '900px', margin: '0 auto', padding: '48px 24px' }}>
         {/* Header */}
+        <div style={{ textAlign: 'center', marginBottom: '16px' }}>
+          <img src="/assets/zombie_hunt_logo.svg" alt="ZOMBIE HUNT" style={{ width: '180px', height: 'auto', display: 'inline-block' }} />
+        </div>
         <div style={{ border: `2px solid ${factionColor}`, background: factionBg, padding: '24px', marginBottom: '8px', textAlign: 'center' }}>
           <div style={{ fontFamily: "'Bebas Neue', cursive", fontSize: '48px', color: factionColor, letterSpacing: '0.05em' }}>{factionText}</div>
         </div>
@@ -196,15 +199,15 @@ export default function Results() {
                     <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '9px', padding: '2px 6px', border: `1px solid ${factionColor}`, color: factionColor }}>WINNER</span>
                   </div>
                   <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '4px' }}>
-                    {stats[winner.id]?.rounds_survived ?? 0} rounds · {stats[winner.id]?.cards_stolen ?? 0} stolen · {stats[winner.id]?.infections_caused ?? 0} infected
+                    {stats[winner.id]?.rounds_survived ?? 0} rounds · {stats[winner.id]?.infections_caused ?? 0} infected
                   </div>
                 </div>
               </div>
             )}
 
             {/* Table headers */}
-            <div style={{ display: 'grid', gridTemplateColumns: '40px 1fr 100px 60px 60px 60px 60px', gap: '8px', padding: '8px 12px', borderBottom: '1px solid var(--color-border)' }}>
-              {['#', 'PLAYER', 'STATUS', 'ROUNDS', 'STOLEN', 'INFECTED', 'SPECIALS'].map(h => (
+            <div style={{ display: 'grid', gridTemplateColumns: '40px 1fr 100px 60px 60px 60px', gap: '8px', padding: '8px 12px', borderBottom: '1px solid var(--color-border)' }}>
+              {['#', 'PLAYER', 'STATUS', 'ROUNDS', 'INFECTED', 'SPECIALS'].map(h => (
                 <span key={h} style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '9px', color: 'var(--color-text-muted)', letterSpacing: '0.15em' }}>{h}</span>
               ))}
             </div>
@@ -214,7 +217,7 @@ export default function Results() {
               const isWinner = p.id === winnerPlayerId
               return (
                 <div key={p.id}
-                  style={{ display: 'grid', gridTemplateColumns: '40px 1fr 100px 60px 60px 60px 60px', gap: '8px', padding: '10px 12px', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.04)', borderLeft: isMe ? '2px solid var(--color-red)' : '2px solid transparent', transition: 'background 150ms' }}
+                  style={{ display: 'grid', gridTemplateColumns: '40px 1fr 100px 60px 60px 60px', gap: '8px', padding: '10px 12px', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.04)', borderLeft: isMe ? '2px solid var(--color-red)' : '2px solid transparent', transition: 'background 150ms' }}
                   onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-surface-2)')}
                   onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                 >
@@ -231,7 +234,6 @@ export default function Results() {
                     {isWinner ? 'WINNER' : p.status.toUpperCase()}
                   </span>
                   <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '12px', color: 'var(--color-text)' }}>{stats[p.id]?.rounds_survived ?? 0}</span>
-                  <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '12px', color: 'var(--color-text)' }}>{stats[p.id]?.cards_stolen ?? 0}</span>
                   <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '12px', color: (stats[p.id]?.infections_caused ?? 0) > 0 ? 'var(--color-green)' : 'var(--color-text-muted)' }}>{stats[p.id]?.infections_caused ?? 0}</span>
                   <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '12px', color: (stats[p.id]?.special_cards_played ?? 0) > 0 ? 'var(--color-warning)' : 'var(--color-text-muted)' }}>{stats[p.id]?.special_cards_played ?? 0}</span>
                 </div>
@@ -266,8 +268,7 @@ export default function Results() {
               } else if (o.event === 'draw') {
                 storyLines.push({ round: log.round_number, text: `${a} and ${b} played equally — no winner`, color: 'var(--color-text-muted)' })
               } else {
-                const stolen = o.stolenCard ? ' and stole a card' : ''
-                const msg = winnerName ? `${winnerName} outplayed ${loserName} in a card duel${stolen}` : `${a} and ${b} clashed${stolen}`
+                const msg = winnerName ? `${winnerName} outplayed ${loserName} in a card duel` : `${a} and ${b} clashed`
                 storyLines.push({ round: log.round_number, text: msg, color: 'var(--color-warning)' })
               }
             }
@@ -275,9 +276,11 @@ export default function Results() {
 
           // Closing line
           const closingText = winnerFaction === 'humans'
-            ? 'The zombie threat has been neutralized. Humanity survives.'
+            ? (isDeadWalkCase
+              ? 'Only one human remains while no infected survive. The dead walk.'
+              : 'The zombie threat has been neutralized. Humanity prevails.')
             : winnerFaction === 'zombies'
-            ? 'The infected have overwhelmed the survivors. The dead walk the earth.'
+            ? 'The infected have overwhelmed the survivors. Zombies won.'
             : 'The conflict ends — no faction claimed total victory.'
 
           return (

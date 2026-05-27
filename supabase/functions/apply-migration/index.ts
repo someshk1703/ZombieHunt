@@ -40,6 +40,18 @@ Deno.serve(async (req: Request) => {
     await sql`ALTER TABLE round_log ADD COLUMN IF NOT EXISTS outcomes JSONB`
     results.push('round_log.outcomes column ensured')
 
+    // Ensure elimination cause supports all runtime values
+    await sql`ALTER TABLE players DROP CONSTRAINT IF EXISTS players_elimination_cause_check`
+    await sql`
+      ALTER TABLE players
+      ADD CONSTRAINT players_elimination_cause_check
+      CHECK (
+        elimination_cause IS NULL
+        OR elimination_cause IN ('shotgun', 'infection', 'no_cards')
+      )
+    `
+    results.push('players.elimination_cause constraint ensured (shotgun/infection/no_cards)')
+
   } catch (err) {
     results.push(`error: ${String(err)}`)
   } finally {

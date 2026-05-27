@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useGameStore } from '../store/gameStore'
 import { supabase } from '../lib/supabase'
+import { audioManager } from '../lib/audio'
 import UsernameModal from '../components/UsernameModal'
 import JoinRoomModal from '../components/JoinRoomModal'
 import RulesModal from '../components/RulesModal'
@@ -20,6 +21,14 @@ export default function Home() {
       setJoinModalOpen(true)
     }
   }, [username, pendingRoomCode])
+
+  // Init audio on first interaction
+  useEffect(() => {
+    const start = () => { audioManager.init(); document.removeEventListener('click', start); document.removeEventListener('touchstart', start) }
+    document.addEventListener('click', start)
+    document.addEventListener('touchstart', start)
+    return () => { document.removeEventListener('click', start); document.removeEventListener('touchstart', start) }
+  }, [])
 
   // Fetch online player count on mount + every 30s
   useEffect(() => {
@@ -59,18 +68,12 @@ export default function Home() {
       >
         {/* Game Title */}
         <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-          <h1
-            className="glitch-text font-display"
-            style={{
-              fontSize: 'clamp(48px, 8vw, 96px)',
-              color: 'var(--color-red)',
-              lineHeight: 1,
-              letterSpacing: '0.05em',
-            }}
-          >
-            ZOMBIE HUNT
-          </h1>
-          <p style={{ fontSize: '11px', color: 'var(--color-text-muted)', letterSpacing: '0.3em', marginTop: '6px', textTransform: 'uppercase' }}>
+          <img
+            src="/assets/zombie_hunt_logo.svg"
+            alt="ZOMBIE HUNT"
+            style={{ width: '100%', maxWidth: '380px', height: 'auto', display: 'block', margin: '0 auto' }}
+          />
+          <p style={{ fontSize: '11px', color: 'var(--color-text-muted)', letterSpacing: '0.3em', marginTop: '8px', textTransform: 'uppercase' }}>
             MULTIPLAYER SURVIVAL CARD GAME
           </p>
         </div>
@@ -86,7 +89,8 @@ export default function Home() {
             className="btn-primary"
             disabled={!hasUsername}
             title={!hasUsername ? 'Set your name first' : undefined}
-            onClick={() => navigate('/lobby/create')}
+            onClick={() => { audioManager.play('btn_click'); navigate('/lobby/create') }}
+            onMouseEnter={() => audioManager.play('btn_hover')}
           >
             CREATE ROOM
           </button>
@@ -95,7 +99,8 @@ export default function Home() {
             className="btn-primary"
             disabled={!hasUsername}
             title={!hasUsername ? 'Set your name first' : undefined}
-            onClick={() => setJoinModalOpen(true)}
+            onClick={() => { audioManager.play('btn_click'); setJoinModalOpen(true) }}
+            onMouseEnter={() => audioManager.play('btn_hover')}
           >
             JOIN ROOM
           </button>

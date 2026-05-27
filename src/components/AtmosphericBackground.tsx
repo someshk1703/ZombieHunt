@@ -4,6 +4,13 @@ export default function AtmosphericBackground() {
       aria-hidden="true"
       style={{ position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none' }}
     >
+      {/* Background illustration */}
+      <img
+        src="/assets/zombie_hunt_background.svg"
+        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.18 }}
+        alt=""
+      />
+
       {/* Grain overlay via SVG feTurbulence */}
       <svg
         style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0.04 }}
