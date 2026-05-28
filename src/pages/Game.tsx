@@ -102,6 +102,7 @@ function GamePhaseRouter() {
   }, [myPlayer.status])
 
   const isByePlayer = gameState.bye_player_id === myPlayer.id
+  const canPlayRound = myPlayer.status !== 'eliminated' && !isByePlayer
 
   return (
     <div style={{ position: 'relative', minHeight: '100vh' }}>
@@ -117,8 +118,8 @@ function GamePhaseRouter() {
         <>
           {gameState.phase === 'deal' && <DealingScreen />}
           {gameState.phase === 'hand_review' && <HandReviewScreen />}
-          {gameState.phase === 'blind_action' && !isByePlayer && <GameRoundScreen />}
-          {gameState.phase === 'blind_action' && isByePlayer && (
+          {gameState.phase === 'blind_action' && canPlayRound && <GameRoundScreen />}
+          {gameState.phase === 'blind_action' && isByePlayer && myPlayer.status !== 'eliminated' && (
             <ByeWaitingScreen players={players} roundNumber={gameState.round_number} />
           )}
           {gameState.phase === 'reveal' && <RevealScreen />}

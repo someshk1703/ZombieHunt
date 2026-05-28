@@ -29,7 +29,6 @@ interface Player {
   is_host: boolean
   infection_rounds: number
   infector_id: string | null
-  score: number
   cards_stolen: number
   infections_caused: number
   special_cards_played: number
@@ -43,7 +42,6 @@ interface PlayerUpdate {
   status: string
   infection_rounds: number
   infector_id: string | null
-  score: number
   cards_stolen: number
   infections_caused: number
   special_cards_played: number
@@ -151,7 +149,6 @@ Deno.serve(async (req: Request) => {
         status: p.status,
         infection_rounds: p.infection_rounds || 0,
         infector_id: p.infector_id || null,
-        score: p.score || 0,
         cards_stolen: p.cards_stolen || 0,
         infections_caused: p.infections_caused || 0,
         special_cards_played: p.special_cards_played || 0,
@@ -243,29 +240,37 @@ Deno.serve(async (req: Request) => {
 
     // ── 6. PERSIST ALL PLAYER UPDATES — parallel Promise.all ─
     // THIS IS THE CRITICAL FIX — all player state written to DB atomically
-    await Promise.all(
+    const playerUpdateResults = await Promise.all(
       Object.entries(playerUpdates).map(([playerId, updates]) =>
         supabase.from('players').update(updates).eq('id', playerId)
+          .then(({ error }) => ({ playerId, error }))
       )
     )
+    const failedPlayerUpdate = playerUpdateResults.find(result => result.error)
+    if (failedPlayerUpdate?.error) {
+      throw new Error(`Player update failed for ${failedPlayerUpdate.playerId}: ${failedPlayerUpdate.error.message}`)
+    }
 
     // ── 7. WRITE ROUND LOG ──────────────────────────────────
-    await supabase.from('round_log').insert({
+    const { error: roundLogError } = await supabase.from('round_log').insert({
       room_id,
       round_number,
       outcomes,
       created_at: new Date().toISOString()
     })
+    if (roundLogError) throw new Error(`Round log insert failed: ${roundLogError.message}`)
 
     // ── 8. WRITE GAME EVENTS (single batch insert) ─────────
     if (gameEvents.length > 0) {
-      await supabase.from('game_events').insert(gameEvents)
+      const { error: gameEventsError } = await supabase.from('game_events').insert(gameEvents)
+      if (gameEventsError) throw new Error(`Game events insert failed: ${gameEventsError.message}`)
     }
 
     // ── 9. FETCH FRESH PLAYER STATE AFTER UPDATES ──────────
     // Win condition MUST run on DB-confirmed data, never on stale in-memory state
-    const { data: freshPlayersRaw } = await supabase
+    const { data: freshPlayersRaw, error: freshPlayersError } = await supabase
       .from('players').select('*').eq('room_id', room_id)
+    if (freshPlayersError) throw new Error(`Fresh player fetch failed: ${freshPlayersError.message}`)
     const freshPlayers = (freshPlayersRaw ?? []) as Player[]
 
     // ── 10. CHECK WIN CONDITION ─────────────────────────────
@@ -274,21 +279,24 @@ Deno.serve(async (req: Request) => {
     const winResult = checkWin(freshPlayers.filter(p => !p.is_bot), round_number, totalRounds)
 
     if (winResult.gameOver) {
-      await supabase.from('game_events').insert({
+      const { error: gameEndEventError } = await supabase.from('game_events').insert({
         room_id, round_number, event_type: 'game_end',
         actor_id: winResult.winnerPlayerId ?? null,
         metadata: { winner_faction: winResult.winnerFaction, total_rounds: round_number }
       })
+      if (gameEndEventError) throw new Error(`Game end event insert failed: ${gameEndEventError.message}`)
 
-      await supabase.from('game_state').update({
+      const { error: finishStateError } = await supabase.from('game_state').update({
         phase: 'finished',
         winner_faction: winResult.winnerFaction,
         winner_player_id: winResult.winnerPlayerId ?? null,
         committed_cards: {},
         updated_at: new Date().toISOString(),
       }).eq('room_id', room_id)
+      if (finishStateError) throw new Error(`Game state finish update failed: ${finishStateError.message}`)
 
-      await supabase.from('rooms').update({ status: 'finished' }).eq('id', room_id)
+      const { error: roomFinishError } = await supabase.from('rooms').update({ status: 'finished' }).eq('id', room_id)
+      if (roomFinishError) throw new Error(`Room finish update failed: ${roomFinishError.message}`)
 
       return new Response(JSON.stringify({
         success: true,
@@ -311,8 +319,9 @@ Deno.serve(async (req: Request) => {
     )
 
     // Build matchup history from round_log to avoid repeat pairings
-    const { data: allLogs } = await supabase
+    const { data: allLogs, error: allLogsError } = await supabase
       .from('round_log').select('outcomes').eq('room_id', room_id)
+    if (allLogsError) throw new Error(`Round log history fetch failed: ${allLogsError.message}`)
 
     const playedMatchups = new Set<string>()
     for (const log of (allLogs ?? [])) {
@@ -335,7 +344,7 @@ Deno.serve(async (req: Request) => {
     // After resolving, advance to discussion phase so players can see results
     // and chat. The DiscussionRoundScreen.startNextRound() will set blind_action
     // + new deadlines when the discussion timer expires or host skips.
-    await supabase.from('game_state').update({
+    const { error: nextStateError } = await supabase.from('game_state').update({
       round_number: round_number + 1,
       phase: 'discussion',
       discussion_started_at: new Date().toISOString(),
@@ -344,6 +353,7 @@ Deno.serve(async (req: Request) => {
       committed_cards: {},
       updated_at: new Date().toISOString(),
     }).eq('room_id', room_id)
+    if (nextStateError) throw new Error(`Game state next-round update failed: ${nextStateError.message}`)
 
     return new Response(JSON.stringify({
       success: true,
