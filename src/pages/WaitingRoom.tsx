@@ -5,7 +5,6 @@ import QRCode from 'qrcode'
 import { useGameStore } from '../store/gameStore'
 import { supabase } from '../lib/supabase'
 import { useToast } from '../components/Toast'
-import { audioManager } from '../lib/audio'
 import AtmosphericBackground from '../components/AtmosphericBackground'
 import LobbyChat from '../components/LobbyChat'
 import SettingsDrawer from '../components/SettingsDrawer'
@@ -65,6 +64,7 @@ export default function WaitingRoom() {
   const [countdown, setCountdown] = useState<number | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [codeCopied, setCodeCopied] = useState(false)
+  const [linkCopied, setLinkCopied] = useState(false)
   const [showJoinModal, setShowJoinModal] = useState(false)
   const [loading, setLoading] = useState(true)
   const [commsOpen, setCommsOpen] = useState(true)
@@ -97,14 +97,6 @@ export default function WaitingRoom() {
       color: { dark: '#0a0a0a', light: '#e8e8e8' },
     }).then(setQrDataUrl).catch(() => {})
   }, [room?.code])
-
-  // Start lobby ambient on first user interaction
-  useEffect(() => {
-    const start = () => { audioManager.playAmbient('lobby'); document.removeEventListener('click', start); document.removeEventListener('touchstart', start) }
-    document.addEventListener('click', start, { once: true })
-    document.addEventListener('touchstart', start, { once: true })
-    return () => { audioManager.stopAmbient(); document.removeEventListener('click', start); document.removeEventListener('touchstart', start) }
-  }, [])
 
   // ── Initial data fetch ────────────────────────────────────────────────────
   useEffect(() => {
@@ -346,9 +338,16 @@ export default function WaitingRoom() {
 
   function copyCode() {
     if (!room) return
-    navigator.clipboard.writeText(`${window.location.origin}/room/${room.code}`)
+    navigator.clipboard.writeText(room.code)
     setCodeCopied(true)
-    setTimeout(() => setCodeCopied(false), 500)
+    setTimeout(() => setCodeCopied(false), 1500)
+  }
+
+  function copyLink() {
+    if (!room) return
+    navigator.clipboard.writeText(`${window.location.origin}/room/${room.code}`)
+    setLinkCopied(true)
+    setTimeout(() => setLinkCopied(false), 1500)
   }
 
   // ── Guards ────────────────────────────────────────────────────────────────
@@ -419,11 +418,12 @@ export default function WaitingRoom() {
                 onClick={copyCode}
                 style={{
                   background: 'none', border: 'none', cursor: 'pointer',
-                  color: codeCopied ? 'var(--color-red)' : 'var(--color-text-muted)',
-                  transition: 'color 150ms',
+                  color: codeCopied ? 'var(--color-green)' : 'var(--color-text-muted)',
+                  transition: 'color 150ms', fontSize: '10px',
+                  fontFamily: "'IBM Plex Mono', monospace",
                 }}
               >
-                <Copy size={13} />
+                {codeCopied ? '✓' : <Copy size={13} />}
               </button>
             </div>
           </div>
@@ -537,10 +537,10 @@ export default function WaitingRoom() {
                             {window.location.origin}/room/{room.code}
                           </span>
                           <button
-                            onClick={copyCode}
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: codeCopied ? 'var(--color-green)' : 'var(--color-text-muted)', flexShrink: 0 }}
+                            onClick={copyLink}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: linkCopied ? 'var(--color-green)' : 'var(--color-text-muted)', flexShrink: 0 }}
                           >
-                            {codeCopied ? '✓' : <Copy size={12} />}
+                            {linkCopied ? '✓' : <Copy size={12} />}
                           </button>
                         </div>
                         {/* QR Code */}

@@ -269,7 +269,9 @@ Deno.serve(async (req: Request) => {
     const freshPlayers = (freshPlayersRaw ?? []) as Player[]
 
     // ── 10. CHECK WIN CONDITION ─────────────────────────────
-    const winResult = checkWin(freshPlayers.filter(p => !p.is_bot))
+    const roomSettings = (room.settings ?? {}) as { total_rounds?: number }
+    const totalRounds = roomSettings.total_rounds ?? 10
+    const winResult = checkWin(freshPlayers.filter(p => !p.is_bot), round_number, totalRounds)
 
     if (winResult.gameOver) {
       await supabase.from('game_events').insert({
@@ -329,19 +331,17 @@ Deno.serve(async (req: Request) => {
       alivePlayers, playedMatchups, subjectZero
     )
 
-    const roomSettings = (room.settings ?? {}) as { negotiation_timer_seconds?: number }
-    const negotiationMs = (roomSettings.negotiation_timer_seconds ?? 60) * 1000
-    const actionMs = 25000
-    const now = Date.now()
-
+    // ── TRANSITION TO DISCUSSION ───────────────────────────
+    // After resolving, advance to discussion phase so players can see results
+    // and chat. The DiscussionRoundScreen.startNextRound() will set blind_action
+    // + new deadlines when the discussion timer expires or host skips.
     await supabase.from('game_state').update({
       round_number: round_number + 1,
-      phase: 'blind_action',
+      phase: 'discussion',
+      discussion_started_at: new Date().toISOString(),
       pairs: newPairs,
       bye_player_id: bye,
       committed_cards: {},
-      negotiation_deadline: new Date(now + negotiationMs).toISOString(),
-      phase_deadline: new Date(now + negotiationMs + actionMs).toISOString(),
       updated_at: new Date().toISOString(),
     }).eq('room_id', room_id)
 
@@ -605,7 +605,7 @@ function selectBotCard(hand: Card[]): Card[] {
 
 // ── WIN CONDITION ─────────────────────────────────────────────
 
-function checkWin(players: Player[]): WinResult {
+function checkWin(players: Player[], roundNumber: number, totalRounds: number): WinResult {
   const active = players.filter(p => p.status !== 'eliminated')
 
   const zombieThreats = active.filter(p =>
@@ -617,7 +617,8 @@ function checkWin(players: Player[]): WinResult {
     !(p.hand ?? []).some(c => c.type === 'zombie' && !c.used)
   )
 
-  // Humans win: no zombie threats remain and at least one human is alive
+  // Humans win: no zombie threats remain (mid-game or final round)
+  // Covers Scenarios 1 & 2: all infected cured/eliminated → HUMANITY PREVAILS
   if (zombieThreats.length === 0 && active.length > 0) {
     return {
       gameOver: true,
@@ -626,12 +627,12 @@ function checkWin(players: Player[]): WinResult {
     }
   }
 
-  // Zombies win: no clean humans remain
+  // Zombies win: no clean humans remain (all infected or eliminated)
   if (cleanHumans.length === 0 && active.length > 0) {
     return { gameOver: true, winnerFaction: 'zombies', winnerPlayerId: null }
   }
 
-  // Last player standing
+  // Last player standing (edge case)
   if (active.length === 1) {
     const last = active[0]
     const isZombie = zombieThreats.some(z => z.id === last.id)
@@ -640,6 +641,12 @@ function checkWin(players: Player[]): WinResult {
       winnerFaction: isZombie ? 'zombies' : 'humans',
       winnerPlayerId: last.id
     }
+  }
+
+  // Final round reached with infection still present → ZOMBIES WON
+  // Covers Scenario 3B: round 3 ends with 2 infected + 1 normal → Zombies win
+  if (roundNumber >= totalRounds && zombieThreats.length > 0) {
+    return { gameOver: true, winnerFaction: 'zombies', winnerPlayerId: null }
   }
 
   return { gameOver: false, winnerFaction: null, winnerPlayerId: null }

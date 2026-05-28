@@ -604,6 +604,12 @@ export default function GameRoundScreen() {
         } else if (oppSpecial?.type === 'shotgun' && myPlayer.status === 'infected') {
           // Opponent's shotgun eliminates me (infected)
           eventLabel = 'SHOTGUN'; winnerLabel = 'YOU WERE ELIMINATED'; winnerColor = '#ff4444'
+        } else if (mySpecial?.type === 'zombie' && oppSpecial?.type === 'vaccine') {
+          // I played zombie but opp played vaccine — I get cured
+          eventLabel = 'VACCINE'; winnerLabel = "YOU'RE CURED"; winnerColor = '#4499ff'
+        } else if (oppSpecial?.type === 'zombie' && mySpecial?.type === 'vaccine') {
+          // Opp played zombie but I played vaccine — opp gets cured
+          eventLabel = 'VACCINE'; winnerLabel = 'OPPONENT CURED'; winnerColor = '#4499ff'
         } else if (mySpecial?.type === 'zombie' && oppSpecial?.type !== 'vaccine' && oppSpecial?.type !== 'shotgun') {
           eventLabel = 'ZOMBIE ATTACK'; winnerLabel = 'YOU INFECT'; winnerColor = 'var(--color-green)'
         } else if (oppSpecial?.type === 'zombie' && mySpecial?.type !== 'vaccine' && mySpecial?.type !== 'shotgun') {

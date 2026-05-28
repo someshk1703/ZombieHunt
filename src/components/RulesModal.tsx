@@ -1,9 +1,83 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import CardFace from './game/CardFace'
+import { Card } from '../store/gameStore'
 
 interface RulesModalProps {
   onClose: () => void
 }
+
+function mockCard(type: Card['type'], value: number, suit: Card['suit'] = null): Card {
+  return { id: `mock-${type}-${value}`, type, value, suit, used: false }
+}
+
+const BATTLES: Array<{
+  label: string
+  tagColor: string
+  cardA: Card
+  statusA: string
+  cardB: Card
+  statusB: string
+  outcome: string
+  outcomeColor: string
+  note: string
+}> = [
+  {
+    label: 'ZOMBIE ATTACK',
+    tagColor: 'var(--color-green)',
+    cardA: mockCard('zombie', 15),
+    statusA: 'INFECTED',
+    cardB: mockCard('number', 5, 'spades'),
+    statusB: 'NORMAL',
+    outcome: 'OPPONENT INFECTED',
+    outcomeColor: 'var(--color-green)',
+    note: 'Zombie beats any number card. The losing player gains a zombie card and becomes infected.',
+  },
+  {
+    label: 'VACCINE vs ZOMBIE',
+    tagColor: '#4499ff',
+    cardA: mockCard('vaccine', 0),
+    statusA: 'NORMAL',
+    cardB: mockCard('zombie', 15),
+    statusB: 'INFECTED',
+    outcome: 'ZOMBIE CURED',
+    outcomeColor: '#4499ff',
+    note: 'Vaccine blocks the zombie attack. The infected zombie-card player is cured and returns to normal.',
+  },
+  {
+    label: 'SHOTGUN vs INFECTED',
+    tagColor: 'var(--color-warning)',
+    cardA: mockCard('shotgun', 0),
+    statusA: 'NORMAL',
+    cardB: mockCard('number', 7, 'hearts'),
+    statusB: 'INFECTED',
+    outcome: 'ELIMINATED',
+    outcomeColor: 'var(--color-red)',
+    note: 'Shotgun fired at an infected player eliminates them permanently. Shotgun is consumed on use.',
+  },
+  {
+    label: 'NUMERIC DUEL',
+    tagColor: 'var(--color-text-muted)',
+    cardA: mockCard('number', 9, 'spades'),
+    statusA: 'NORMAL',
+    cardB: mockCard('number', 4, 'hearts'),
+    statusB: 'NORMAL',
+    outcome: '9 WINS',
+    outcomeColor: 'var(--color-text)',
+    note: 'Both play number cards — higher total wins the duel. Equal totals result in a DRAW.',
+  },
+  {
+    label: 'SHOTGUN vs NORMAL',
+    tagColor: 'var(--color-text-muted)',
+    cardA: mockCard('shotgun', 0),
+    statusA: 'NORMAL',
+    cardB: mockCard('number', 3, 'clubs'),
+    statusB: 'NORMAL',
+    outcome: '3 WINS',
+    outcomeColor: 'var(--color-text)',
+    note: 'Shotgun counts as 0 against a non-infected target. The number card wins by numeric comparison.',
+  },
+]
 
 const SECTIONS = [
   {
@@ -47,6 +121,12 @@ const SECTIONS = [
     ],
   },
   {
+    icon: '🥊',
+    title: 'COMBAT GUIDE',
+    content: [],
+    visual: true as const,
+  },
+  {
     icon: '🧟',
     title: 'INFECTION',
     content: [
@@ -68,7 +148,9 @@ const SECTIONS = [
 
 export default function RulesModal({ onClose }: RulesModalProps) {
   const [activeSection, setActiveSection] = useState(0)
+  const [battleIndex, setBattleIndex] = useState(0)
   const section = SECTIONS[activeSection]
+  const isVisual = 'visual' in section && section.visual
 
   return (
     <AnimatePresence>
@@ -179,6 +261,148 @@ export default function RulesModal({ onClose }: RulesModalProps) {
                     </span>
                   </div>
 
+                  {isVisual ? (
+                    <div>
+                      {/* Battle selector tabs */}
+                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '24px' }}>
+                        {BATTLES.map((b, i) => (
+                          <button
+                            key={i}
+                            onClick={() => setBattleIndex(i)}
+                            style={{
+                              fontFamily: "'IBM Plex Mono', monospace", fontSize: '9px',
+                              letterSpacing: '0.1em', padding: '4px 10px',
+                              border: `1px solid ${battleIndex === i ? b.tagColor : 'var(--color-border)'}`,
+                              background: battleIndex === i ? `${b.tagColor}18` : 'transparent',
+                              color: battleIndex === i ? b.tagColor : 'var(--color-text-muted)',
+                              cursor: 'pointer', transition: 'all 150ms',
+                            }}
+                          >
+                            {b.label}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Battle scenario */}
+                      <AnimatePresence mode="wait">
+                        <motion.div
+                          key={battleIndex}
+                          initial={{ opacity: 0, y: 8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -8 }}
+                          transition={{ duration: 0.18 }}
+                        >
+                          {(() => {
+                            const battle = BATTLES[battleIndex]
+                            return (
+                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
+                                {/* Cards row */}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
+                                  {/* Player A */}
+                                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                                    <div style={{
+                                      fontFamily: "'IBM Plex Mono', monospace", fontSize: '9px',
+                                      letterSpacing: '0.15em', color: 'var(--color-text-muted)',
+                                    }}>
+                                      PLAYER A
+                                    </div>
+                                    <CardFace card={battle.cardA} size="md" />
+                                    <div style={{
+                                      fontFamily: "'IBM Plex Mono', monospace", fontSize: '9px',
+                                      letterSpacing: '0.1em', padding: '2px 8px',
+                                      border: `1px solid ${battle.statusA === 'INFECTED' ? 'var(--color-green)' : 'var(--color-border)'}`,
+                                      color: battle.statusA === 'INFECTED' ? 'var(--color-green)' : 'var(--color-text-muted)',
+                                    }}>
+                                      {battle.statusA}
+                                    </div>
+                                  </div>
+
+                                  {/* VS */}
+                                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                                    <div style={{ fontFamily: "'Bebas Neue', cursive", fontSize: '32px', color: 'var(--color-border)' }}>VS</div>
+                                  </div>
+
+                                  {/* Player B */}
+                                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                                    <div style={{
+                                      fontFamily: "'IBM Plex Mono', monospace", fontSize: '9px',
+                                      letterSpacing: '0.15em', color: 'var(--color-text-muted)',
+                                    }}>
+                                      PLAYER B
+                                    </div>
+                                    <CardFace card={battle.cardB} size="md" />
+                                    <div style={{
+                                      fontFamily: "'IBM Plex Mono', monospace", fontSize: '9px',
+                                      letterSpacing: '0.1em', padding: '2px 8px',
+                                      border: `1px solid ${battle.statusB === 'INFECTED' ? 'var(--color-green)' : 'var(--color-border)'}`,
+                                      color: battle.statusB === 'INFECTED' ? 'var(--color-green)' : 'var(--color-text-muted)',
+                                    }}>
+                                      {battle.statusB}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Arrow + outcome */}
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                                  <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '18px', color: 'var(--color-border)' }}>↓</div>
+                                  <motion.div
+                                    animate={{ scale: [1, 1.04, 1] }}
+                                    transition={{ repeat: Infinity, duration: 2 }}
+                                    style={{
+                                      fontFamily: "'Bebas Neue', cursive", fontSize: '28px',
+                                      letterSpacing: '0.1em', color: battle.outcomeColor,
+                                      padding: '6px 20px',
+                                      border: `1px solid ${battle.outcomeColor}`,
+                                      background: `${battle.outcomeColor}12`,
+                                    }}
+                                  >
+                                    {battle.outcome}
+                                  </motion.div>
+                                </div>
+
+                                {/* Explanation */}
+                                <p style={{
+                                  fontFamily: "'IBM Plex Mono', monospace", fontSize: '12px',
+                                  color: 'var(--color-text-muted)', lineHeight: 1.7,
+                                  textAlign: 'center', maxWidth: '340px',
+                                  borderTop: '1px solid var(--color-border)', paddingTop: '16px',
+                                }}>
+                                  {battle.note}
+                                </p>
+
+                                {/* Prev / next battle */}
+                                <div style={{ display: 'flex', gap: '12px', marginTop: '4px' }}>
+                                  <button
+                                    onClick={() => setBattleIndex(i => Math.max(0, i - 1))}
+                                    disabled={battleIndex === 0}
+                                    style={{
+                                      fontFamily: "'IBM Plex Mono', monospace", fontSize: '10px',
+                                      background: 'none', border: '1px solid var(--color-border)',
+                                      color: battleIndex === 0 ? 'var(--color-border)' : 'var(--color-text-muted)',
+                                      padding: '4px 12px', cursor: battleIndex === 0 ? 'not-allowed' : 'pointer',
+                                    }}
+                                  >← PREV</button>
+                                  <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '9px', color: 'var(--color-text-muted)', alignSelf: 'center' }}>
+                                    {battleIndex + 1} / {BATTLES.length}
+                                  </span>
+                                  <button
+                                    onClick={() => setBattleIndex(i => Math.min(BATTLES.length - 1, i + 1))}
+                                    disabled={battleIndex === BATTLES.length - 1}
+                                    style={{
+                                      fontFamily: "'IBM Plex Mono', monospace", fontSize: '10px',
+                                      background: 'none', border: '1px solid var(--color-border)',
+                                      color: battleIndex === BATTLES.length - 1 ? 'var(--color-border)' : 'var(--color-text-muted)',
+                                      padding: '4px 12px', cursor: battleIndex === BATTLES.length - 1 ? 'not-allowed' : 'pointer',
+                                    }}
+                                  >NEXT →</button>
+                                </div>
+                              </div>
+                            )
+                          })()}
+                        </motion.div>
+                      </AnimatePresence>
+                    </div>
+                  ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     {section.content.map((line, i) => (
                       <motion.p
@@ -199,6 +423,7 @@ export default function RulesModal({ onClose }: RulesModalProps) {
                       </motion.p>
                     ))}
                   </div>
+                  )}
                 </motion.div>
               </AnimatePresence>
             </div>

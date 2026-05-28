@@ -53,7 +53,17 @@ export default function CreateRoom() {
   const { user, username, avatarUrl, setCurrentRoom } = useGameStore()
   const { showToast } = useToast()
 
-  const [roomName, setRoomName] = useState(`${username}'s Room`)
+  const [roomName, setRoomName] = useState(() => {
+    const names = [
+      'TOKYO DEATH MATCH', 'NO MERCY', 'LAST MAN STANDING', 'KILL OR BE KILLED',
+      'DEAD ZONE', 'ZERO SURVIVORS', 'BLOOD ARENA', 'FINAL HOUR',
+      'OUTBREAK PROTOCOL', 'HUNT OR DIE', 'NO ESCAPE', 'INFECTED GROUNDS',
+      'LAST BREATH', 'DARK RECKONING', 'CHAOS PROTOCOL', 'IRON CURTAIN',
+      'THE PURGE', 'EXTINCTION EVENT', 'RED ZONE', 'SAVAGE LANDS',
+      'POINT OF NO RETURN', 'DOOMSDAY CLOCK', 'WASTELAND DUEL', 'FALL OF MAN',
+    ]
+    return names[Math.floor(Math.random() * names.length)]
+  })
   const [roomNameError, setRoomNameError] = useState('')
   const [maxPlayers, setMaxPlayers] = useState(8)
   const [timer, setTimer] = useState<number>(60)
