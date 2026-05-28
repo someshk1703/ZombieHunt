@@ -102,11 +102,13 @@ function resolveSpecialCards(cardsA: Card[], cardsB: Card[], pA: Player, pB: Pla
   // Both commit zombie cards — zombie duel, numeric tiebreak
   if (sA?.type === 'zombie' && sB?.type === 'zombie') return resolveNumeric(cardsA, cardsB, pA, pB)
 
-  // Priority 1 — Shotgun: eliminates infected opponent; useless against alive players
-  if (sA?.type === 'shotgun' && pB.status === 'infected') {
+  // Priority 1 — Shotgun: eliminates opponent who holds a zombie card OR is already infected
+  const pBIsZombieThreat = pB.status === 'infected' || pB.hand.some((c: Card) => c.type === 'zombie' && !c.used)
+  const pAIsZombieThreat = pA.status === 'infected' || pA.hand.some((c: Card) => c.type === 'zombie' && !c.used)
+  if (sA?.type === 'shotgun' && pBIsZombieThreat) {
     return { winner_id: pA.id, loser_id: pB.id, event: 'elimination', eliminatedId: pB.id, totalA: 0, totalB: 0 }
   }
-  if (sB?.type === 'shotgun' && pA.status === 'infected') {
+  if (sB?.type === 'shotgun' && pAIsZombieThreat) {
     return { winner_id: pB.id, loser_id: pA.id, event: 'elimination', eliminatedId: pA.id, totalA: 0, totalB: 0 }
   }
 
@@ -449,8 +451,11 @@ Deno.serve(async (req: Request) => {
   // Fetch all alive players EXCEPT Subject Zero — lobby bots are included as normal players
   const { data: aliveData } = await supabase.from('players').select('*').eq('room_id', room_id).in('status', ['alive', 'infected']).neq('user_id', SUBJECT_ZERO_USER_ID)
   const realAlive: Player[] = aliveData ?? []
-  const humansNow = realAlive.filter((p: Player) => p.status === 'alive')
-  const zombiesNow = realAlive.filter((p: Player) => p.status === 'infected')
+  // A player is a zombie THREAT if infected OR holding an unplayed zombie card (Bug 5 fix)
+  const isZombieThreat = (p: Player): boolean =>
+    p.status === 'infected' || (p.hand ?? []).some((c: Card) => c.type === 'zombie' && !c.used)
+  const zombiesNow = realAlive.filter(isZombieThreat)
+  const humansNow = realAlive.filter(p => !isZombieThreat(p))
 
   // Determine total rounds from room settings
   const roomSettings = (room.settings ?? {}) as { total_rounds?: number; max_players?: number }
@@ -493,7 +498,7 @@ Deno.serve(async (req: Request) => {
     } else {
       // Only 1 player alive
       const last = realAlive[0]
-      winnerFaction = last.status === 'infected' ? 'zombies' : 'humans'
+      winnerFaction = isZombieThreat(last) ? 'zombies' : 'humans'
       winnerPlayerId = last.id
     }
 
