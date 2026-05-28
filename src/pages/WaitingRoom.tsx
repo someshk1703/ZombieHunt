@@ -65,6 +65,7 @@ export default function WaitingRoom() {
   const [countdown, setCountdown] = useState<number | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [codeCopied, setCodeCopied] = useState(false)
+  const [linkCopied, setLinkCopied] = useState(false)
   const [showJoinModal, setShowJoinModal] = useState(false)
   const [loading, setLoading] = useState(true)
   const [commsOpen, setCommsOpen] = useState(true)
@@ -346,9 +347,16 @@ export default function WaitingRoom() {
 
   function copyCode() {
     if (!room) return
-    navigator.clipboard.writeText(`${window.location.origin}/room/${room.code}`)
+    navigator.clipboard.writeText(room.code)
     setCodeCopied(true)
-    setTimeout(() => setCodeCopied(false), 500)
+    setTimeout(() => setCodeCopied(false), 1500)
+  }
+
+  function copyLink() {
+    if (!room) return
+    navigator.clipboard.writeText(`${window.location.origin}/room/${room.code}`)
+    setLinkCopied(true)
+    setTimeout(() => setLinkCopied(false), 1500)
   }
 
   // ── Guards ────────────────────────────────────────────────────────────────
@@ -419,11 +427,12 @@ export default function WaitingRoom() {
                 onClick={copyCode}
                 style={{
                   background: 'none', border: 'none', cursor: 'pointer',
-                  color: codeCopied ? 'var(--color-red)' : 'var(--color-text-muted)',
-                  transition: 'color 150ms',
+                  color: codeCopied ? 'var(--color-green)' : 'var(--color-text-muted)',
+                  transition: 'color 150ms', fontSize: '10px',
+                  fontFamily: "'IBM Plex Mono', monospace",
                 }}
               >
-                <Copy size={13} />
+                {codeCopied ? '✓' : <Copy size={13} />}
               </button>
             </div>
           </div>
@@ -537,10 +546,10 @@ export default function WaitingRoom() {
                             {window.location.origin}/room/{room.code}
                           </span>
                           <button
-                            onClick={copyCode}
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: codeCopied ? 'var(--color-green)' : 'var(--color-text-muted)', flexShrink: 0 }}
+                            onClick={copyLink}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: linkCopied ? 'var(--color-green)' : 'var(--color-text-muted)', flexShrink: 0 }}
                           >
-                            {codeCopied ? '✓' : <Copy size={12} />}
+                            {linkCopied ? '✓' : <Copy size={12} />}
                           </button>
                         </div>
                         {/* QR Code */}

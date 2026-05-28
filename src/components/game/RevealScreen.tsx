@@ -51,6 +51,11 @@ export default function RevealScreen() {
         const sB = cardsB.find(c => c.type !== 'number')
         if (sA?.type === 'zombie' || sB?.type === 'zombie') event = 'zombie'
         if (sA?.type === 'shotgun' || sB?.type === 'shotgun') event = 'shotgun'
+        // Vaccine neutralises zombie attack, or cures an already-infected player
+        if (
+          (sA?.type === 'vaccine' && (sB?.type === 'zombie' || (pB as { status?: string }).status === 'infected')) ||
+          (sB?.type === 'vaccine' && (sA?.type === 'zombie' || (pA as { status?: string }).status === 'infected'))
+        ) event = 'vaccine'
         if (totalA > totalB) winnerId = pA.id
         if (totalB > totalA) winnerId = pB.id
 
@@ -251,6 +256,8 @@ export default function RevealScreen() {
                 >
                   {(currentPair.winnerId === currentPair.playerA.id ? currentPair.playerA : currentPair.playerB).username} WINS THIS ROUND
                 </motion.div>
+              ) : currentPair.event === 'vaccine' ? (
+                <div style={{ fontFamily: "'Bebas Neue', cursive", fontSize: '28px', color: '#4499ff' }}>CURED</div>
               ) : (
                 <div style={{ fontFamily: "'Bebas Neue', cursive", fontSize: '28px', color: 'var(--color-text-muted)' }}>DRAW</div>
               )}
