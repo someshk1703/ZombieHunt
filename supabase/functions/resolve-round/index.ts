@@ -421,23 +421,33 @@ function resolvePair(
   // ── ZOMBIE vs VACCINE ─────────────────────────────────────
   // Rule: vaccine cures the ZOMBIE CARD HOLDER (the infected player), not the vaccine player.
   // Scenario 1/2 Round 2: D plays zombie, B plays vaccine → D becomes normal.
+  // winner_id is explicitly set to the VACCINE HOLDER so actor_id in game events is correct.
   if (specialA?.type === 'zombie' && specialB?.type === 'vaccine') {
-    curePlayer(pA.id, updates)  // pA holds zombie card and is infected — they get cured
-    return { ...resolveNumeric(pA, pB, cardsA, cardsB, updates), event: 'vaccine', cured_id: pA.id }
+    curePlayer(pA.id, updates)  // pA holds zombie card — they get cured
+    const numeric = resolveNumeric(pA, pB, cardsA, cardsB, updates)
+    return { ...numeric, winner_id: pB.id, loser_id: pA.id, event: 'vaccine', cured_id: pA.id }
   }
   if (specialB?.type === 'zombie' && specialA?.type === 'vaccine') {
-    curePlayer(pB.id, updates)  // pB holds zombie card and is infected — they get cured
-    return { ...resolveNumeric(pA, pB, cardsA, cardsB, updates), event: 'vaccine', cured_id: pB.id }
+    curePlayer(pB.id, updates)  // pB holds zombie card — they get cured
+    const numeric = resolveNumeric(pA, pB, cardsA, cardsB, updates)
+    return { ...numeric, winner_id: pA.id, loser_id: pB.id, event: 'vaccine', cured_id: pB.id }
   }
 
-  // ── STANDALONE VACCINE (self-cure) ────────────────────────
+  // ── STANDALONE VACCINE (self-cure or vaccine vs non-zombie) ───
+  // Vaccine is consumed and self-cure applied; event tagged 'vaccine' so game log captures it.
   if (specialA?.type === 'vaccine' && !specialB) {
-    if (updates[pA.id].status === 'infected') curePlayer(pA.id, updates)
-    return resolveNumeric(pA, pB, cardsA, cardsB, updates)
+    const wasCured = updates[pA.id].status === 'infected'
+    if (wasCured) curePlayer(pA.id, updates)
+    const numeric = resolveNumeric(pA, pB, cardsA, cardsB, updates)
+    if (wasCured) return { ...numeric, winner_id: pA.id, event: 'vaccine', cured_id: pA.id }
+    return numeric
   }
   if (specialB?.type === 'vaccine' && !specialA) {
-    if (updates[pB.id].status === 'infected') curePlayer(pB.id, updates)
-    return resolveNumeric(pA, pB, cardsA, cardsB, updates)
+    const wasCured = updates[pB.id].status === 'infected'
+    if (wasCured) curePlayer(pB.id, updates)
+    const numeric = resolveNumeric(pA, pB, cardsA, cardsB, updates)
+    if (wasCured) return { ...numeric, winner_id: pB.id, event: 'vaccine', cured_id: pB.id }
+    return numeric
   }
 
   // ── ZOMBIE → INFECTION ────────────────────────────────────
@@ -604,9 +614,24 @@ function selectBotCard(hand: Card[]): Card[] {
 }
 
 // ── WIN CONDITION ─────────────────────────────────────────────
+//
+// Rules (checked in priority order):
+//
+//  0. All eliminated simultaneously        → draw (no winner)
+//  1. zombieThreats === 0                  → Humans win (all threats gone)
+//  2. cleanHumans === 0                    → Zombies win (no humans left)
+//  3. cleanHumans === 1  (any zombie count) → "THE DEAD MAN WALK" → Humans win (lone survivor)
+//  4. zombieThreats < cleanHumans          → Humans win (humans outnumber zombies)
+//  5. cleanHumans   < zombieThreats        → Zombies win (zombies outnumber humans)
+//  6. Final round (tied counts)            → majority wins; humans win on exact tie (survivors)
 
 function checkWin(players: Player[], roundNumber: number, totalRounds: number): WinResult {
   const active = players.filter(p => p.status !== 'eliminated')
+
+  // 0. All players eliminated in the same round (e.g. simultaneous shotgun)
+  if (active.length === 0) {
+    return { gameOver: true, winnerFaction: null, winnerPlayerId: null }
+  }
 
   const zombieThreats = active.filter(p =>
     p.status === 'infected' ||
@@ -617,35 +642,54 @@ function checkWin(players: Player[], roundNumber: number, totalRounds: number): 
     !(p.hand ?? []).some(c => c.type === 'zombie' && !c.used)
   )
 
-  // Humans win: no zombie threats remain (mid-game or final round)
-  // Covers Scenarios 1 & 2: all infected cured/eliminated → HUMANITY PREVAILS
-  if (zombieThreats.length === 0 && active.length > 0) {
+  // 1. No zombie threats remain → humanity prevails
+  if (zombieThreats.length === 0) {
     return {
       gameOver: true,
       winnerFaction: 'humans',
-      winnerPlayerId: cleanHumans.length === 1 ? cleanHumans[0].id : null
+      winnerPlayerId: cleanHumans.length === 1 ? cleanHumans[0].id : null,
     }
   }
 
-  // Zombies win: no clean humans remain (all infected or eliminated)
-  if (cleanHumans.length === 0 && active.length > 0) {
+  // 2. No clean humans remain → zombie apocalypse
+  if (cleanHumans.length === 0) {
     return { gameOver: true, winnerFaction: 'zombies', winnerPlayerId: null }
   }
 
-  // Last player standing (edge case)
-  if (active.length === 1) {
-    const last = active[0]
-    const isZombie = zombieThreats.some(z => z.id === last.id)
+  // 3. THE DEAD MAN WALK — exactly one human left against any number of zombies.
+  //    The last survivor wins for humanity regardless of zombie count.
+  if (cleanHumans.length === 1) {
     return {
       gameOver: true,
-      winnerFaction: isZombie ? 'zombies' : 'humans',
-      winnerPlayerId: last.id
+      winnerFaction: 'humans',
+      winnerPlayerId: cleanHumans[0].id,
     }
   }
 
-  // Final round reached with infection still present → ZOMBIES WON
-  // Covers Scenario 3B: round 3 ends with 2 infected + 1 normal → Zombies win
-  if (roundNumber >= totalRounds && zombieThreats.length > 0) {
+  // 4. Humans outnumber zombie threats → humans win (containment achieved)
+  if (zombieThreats.length < cleanHumans.length) {
+    return {
+      gameOver: true,
+      winnerFaction: 'humans',
+      winnerPlayerId: null, // multiple humans remain; no individual winner
+    }
+  }
+
+  // 5. Zombies outnumber clean humans → tipping point; zombies win
+  if (cleanHumans.length < zombieThreats.length) {
+    return { gameOver: true, winnerFaction: 'zombies', winnerPlayerId: null }
+  }
+
+  // 6. Final round with tied counts → majority determines winner.
+  //    Humans win on exact tie (they survived to the end).
+  if (roundNumber >= totalRounds) {
+    if (cleanHumans.length >= zombieThreats.length) {
+      return {
+        gameOver: true,
+        winnerFaction: 'humans',
+        winnerPlayerId: cleanHumans.length === 1 ? cleanHumans[0].id : null,
+      }
+    }
     return { gameOver: true, winnerFaction: 'zombies', winnerPlayerId: null }
   }
 

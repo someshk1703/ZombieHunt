@@ -232,7 +232,7 @@ export default function RevealScreen() {
           </div>
         )}
 
-        {/* Result */}
+              {/* Result */}
         <AnimatePresence>
           {stage === 'result' || stage === 'next' ? (
             <motion.div
@@ -240,15 +240,27 @@ export default function RevealScreen() {
               animate={{ opacity: 1, y: 0 }}
               style={{ textAlign: 'center', marginTop: '16px' }}
             >
-              <div style={{ display: 'flex', gap: '32px', justifyContent: 'center', marginBottom: '16px' }}>
-                <div style={{ fontFamily: "'Bebas Neue', cursive", fontSize: '48px', color: currentPair.winnerId === currentPair.playerA.id ? 'var(--color-text)' : 'var(--color-text-muted)' }}>
-                  {currentPair.totalA}
+              {/* Only show numeric totals for non-special or zombie events */}
+              {currentPair.event !== 'vaccine' && currentPair.event !== 'elimination' && (
+                <div style={{ display: 'flex', gap: '32px', justifyContent: 'center', marginBottom: '16px' }}>
+                  <div style={{ fontFamily: "'Bebas Neue', cursive", fontSize: '48px', color: currentPair.winnerId === currentPair.playerA.id ? 'var(--color-text)' : 'var(--color-text-muted)' }}>
+                    {currentPair.totalA}
+                  </div>
+                  <div style={{ fontFamily: "'Bebas Neue', cursive", fontSize: '48px', color: currentPair.winnerId === currentPair.playerB.id ? 'var(--color-text)' : 'var(--color-text-muted)' }}>
+                    {currentPair.totalB}
+                  </div>
                 </div>
-                <div style={{ fontFamily: "'Bebas Neue', cursive", fontSize: '48px', color: currentPair.winnerId === currentPair.playerB.id ? 'var(--color-text)' : 'var(--color-text-muted)' }}>
-                  {currentPair.totalB}
-                </div>
-              </div>
-              {currentPair.winnerId ? (
+              )}
+              {/* Vaccine always wins — show VACCINE USED regardless of numeric outcome */}
+              {currentPair.event === 'vaccine' ? (
+                <motion.div
+                  animate={{ scale: [1, 1.05, 1] }}
+                  transition={{ repeat: Infinity, duration: 1.5 }}
+                  style={{ fontFamily: "'Bebas Neue', cursive", fontSize: '28px', color: '#4499ff' }}
+                >
+                  💉 VACCINE USED
+                </motion.div>
+              ) : currentPair.winnerId ? (
                 <motion.div
                   animate={{ scale: [1, 1.05, 1] }}
                   transition={{ repeat: Infinity, duration: 1.5 }}
@@ -256,8 +268,6 @@ export default function RevealScreen() {
                 >
                   {(currentPair.winnerId === currentPair.playerA.id ? currentPair.playerA : currentPair.playerB).username} WINS THIS ROUND
                 </motion.div>
-              ) : currentPair.event === 'vaccine' ? (
-                <div style={{ fontFamily: "'Bebas Neue', cursive", fontSize: '28px', color: '#4499ff' }}>CURED</div>
               ) : (
                 <div style={{ fontFamily: "'Bebas Neue', cursive", fontSize: '28px', color: 'var(--color-text-muted)' }}>DRAW</div>
               )}

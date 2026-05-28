@@ -108,7 +108,13 @@ export function GameProvider({ room, initialPlayers, gameState: initialGameState
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'players', filter: `id=eq.${myPlayer.id}` }, payload => {
         const updated = payload.new as GamePlayer
         setMyPlayer(updated)
-        if (updated.hand?.length) setMyHand(updated.hand)
+        // hand may arrive as a JSON string (JSONB text) or a proper array — handle both.
+        // Always call setMyHand so an emptied hand (shotgun/vaccine consumed) is reflected.
+        const rawHand = (updated as unknown as { hand: unknown }).hand
+        const parsedHand: Card[] = Array.isArray(rawHand)
+          ? (rawHand as Card[])
+          : (typeof rawHand === 'string' ? JSON.parse(rawHand) : [])
+        setMyHand(parsedHand)
       })
       .subscribe()
     return () => { supabase.removeChannel(channel) }
