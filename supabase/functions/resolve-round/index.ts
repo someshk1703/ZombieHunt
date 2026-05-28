@@ -29,7 +29,6 @@ interface Player {
   is_host: boolean
   infection_rounds: number
   infector_id: string | null
-  score: number
   cards_stolen: number
   infections_caused: number
   special_cards_played: number
@@ -43,7 +42,6 @@ interface PlayerUpdate {
   status: string
   infection_rounds: number
   infector_id: string | null
-  score: number
   cards_stolen: number
   infections_caused: number
   special_cards_played: number
@@ -151,7 +149,6 @@ Deno.serve(async (req: Request) => {
         status: p.status,
         infection_rounds: p.infection_rounds || 0,
         infector_id: p.infector_id || null,
-        score: p.score || 0,
         cards_stolen: p.cards_stolen || 0,
         infections_caused: p.infections_caused || 0,
         special_cards_played: p.special_cards_played || 0,
@@ -243,29 +240,37 @@ Deno.serve(async (req: Request) => {
 
     // ── 6. PERSIST ALL PLAYER UPDATES — parallel Promise.all ─
     // THIS IS THE CRITICAL FIX — all player state written to DB atomically
-    await Promise.all(
+    const playerUpdateResults = await Promise.all(
       Object.entries(playerUpdates).map(([playerId, updates]) =>
         supabase.from('players').update(updates).eq('id', playerId)
+          .then(({ error }) => ({ playerId, error }))
       )
     )
+    const failedPlayerUpdate = playerUpdateResults.find(result => result.error)
+    if (failedPlayerUpdate?.error) {
+      throw new Error(`Player update failed for ${failedPlayerUpdate.playerId}: ${failedPlayerUpdate.error.message}`)
+    }
 
     // ── 7. WRITE ROUND LOG ──────────────────────────────────
-    await supabase.from('round_log').insert({
+    const { error: roundLogError } = await supabase.from('round_log').insert({
       room_id,
       round_number,
       outcomes,
       created_at: new Date().toISOString()
     })
+    if (roundLogError) throw new Error(`Round log insert failed: ${roundLogError.message}`)
 
     // ── 8. WRITE GAME EVENTS (single batch insert) ─────────
     if (gameEvents.length > 0) {
-      await supabase.from('game_events').insert(gameEvents)
+      const { error: gameEventsError } = await supabase.from('game_events').insert(gameEvents)
+      if (gameEventsError) throw new Error(`Game events insert failed: ${gameEventsError.message}`)
     }
 
     // ── 9. FETCH FRESH PLAYER STATE AFTER UPDATES ──────────
     // Win condition MUST run on DB-confirmed data, never on stale in-memory state
-    const { data: freshPlayersRaw } = await supabase
+    const { data: freshPlayersRaw, error: freshPlayersError } = await supabase
       .from('players').select('*').eq('room_id', room_id)
+    if (freshPlayersError) throw new Error(`Fresh player fetch failed: ${freshPlayersError.message}`)
     const freshPlayers = (freshPlayersRaw ?? []) as Player[]
 
     // ── 10. CHECK WIN CONDITION ─────────────────────────────
@@ -274,21 +279,24 @@ Deno.serve(async (req: Request) => {
     const winResult = checkWin(freshPlayers.filter(p => !p.is_bot), round_number, totalRounds)
 
     if (winResult.gameOver) {
-      await supabase.from('game_events').insert({
+      const { error: gameEndEventError } = await supabase.from('game_events').insert({
         room_id, round_number, event_type: 'game_end',
         actor_id: winResult.winnerPlayerId ?? null,
         metadata: { winner_faction: winResult.winnerFaction, total_rounds: round_number }
       })
+      if (gameEndEventError) throw new Error(`Game end event insert failed: ${gameEndEventError.message}`)
 
-      await supabase.from('game_state').update({
+      const { error: finishStateError } = await supabase.from('game_state').update({
         phase: 'finished',
         winner_faction: winResult.winnerFaction,
         winner_player_id: winResult.winnerPlayerId ?? null,
         committed_cards: {},
         updated_at: new Date().toISOString(),
       }).eq('room_id', room_id)
+      if (finishStateError) throw new Error(`Game state finish update failed: ${finishStateError.message}`)
 
-      await supabase.from('rooms').update({ status: 'finished' }).eq('id', room_id)
+      const { error: roomFinishError } = await supabase.from('rooms').update({ status: 'finished' }).eq('id', room_id)
+      if (roomFinishError) throw new Error(`Room finish update failed: ${roomFinishError.message}`)
 
       return new Response(JSON.stringify({
         success: true,
@@ -311,8 +319,9 @@ Deno.serve(async (req: Request) => {
     )
 
     // Build matchup history from round_log to avoid repeat pairings
-    const { data: allLogs } = await supabase
+    const { data: allLogs, error: allLogsError } = await supabase
       .from('round_log').select('outcomes').eq('room_id', room_id)
+    if (allLogsError) throw new Error(`Round log history fetch failed: ${allLogsError.message}`)
 
     const playedMatchups = new Set<string>()
     for (const log of (allLogs ?? [])) {
@@ -335,7 +344,7 @@ Deno.serve(async (req: Request) => {
     // After resolving, advance to discussion phase so players can see results
     // and chat. The DiscussionRoundScreen.startNextRound() will set blind_action
     // + new deadlines when the discussion timer expires or host skips.
-    await supabase.from('game_state').update({
+    const { error: nextStateError } = await supabase.from('game_state').update({
       round_number: round_number + 1,
       phase: 'discussion',
       discussion_started_at: new Date().toISOString(),
@@ -344,6 +353,7 @@ Deno.serve(async (req: Request) => {
       committed_cards: {},
       updated_at: new Date().toISOString(),
     }).eq('room_id', room_id)
+    if (nextStateError) throw new Error(`Game state next-round update failed: ${nextStateError.message}`)
 
     return new Response(JSON.stringify({
       success: true,
@@ -383,10 +393,11 @@ function resolvePair(
   if (specialA) updates[pA.id].special_cards_played += 1
   if (specialB) updates[pB.id].special_cards_played += 1
 
-  // Remove played cards from hand EXCEPT zombie
-  // Zombie stays until cured by vaccine or eliminated by shotgun
-  consumeCards(pA.id, cardsA, updates)
-  consumeCards(pB.id, cardsB, updates)
+  // Only shotgun/vaccine vanish immediately on use.
+  // Number cards stay unless the player loses a numeric duel; zombie cards stay
+  // until cured by vaccine or the player is eliminated.
+  consumeUsedSpecialCards(pA.id, cardsA, updates)
+  consumeUsedSpecialCards(pB.id, cardsB, updates)
 
   // ── SHOTGUN ───────────────────────────────────────────────
   // Eliminates any opponent holding a zombie card OR with infected status
@@ -418,42 +429,41 @@ function resolvePair(
     return resolveNumeric(pA, pB, cardsA, cardsB, updates)
   }
 
-  // ── ZOMBIE vs VACCINE ─────────────────────────────────────
-  // Rule: vaccine cures the ZOMBIE CARD HOLDER (the infected player), not the vaccine player.
-  // Scenario 1/2 Round 2: D plays zombie, B plays vaccine → D becomes normal.
-  // winner_id is explicitly set to the VACCINE HOLDER so actor_id in game events is correct.
-  if (specialA?.type === 'zombie' && specialB?.type === 'vaccine') {
-    curePlayer(pA.id, updates)  // pA holds zombie card — they get cured
-    const numeric = resolveNumeric(pA, pB, cardsA, cardsB, updates)
-    return { ...numeric, winner_id: pB.id, loser_id: pA.id, event: 'vaccine', cured_id: pA.id }
+  // ── VACCINE ───────────────────────────────────────────────
+  // Vaccine cures the infected/zombie-card holder in the duel, even if that
+  // player did not commit their zombie card. Prefer curing the opponent; fall
+  // back to self-cure if the vaccine holder is infected.
+  if (specialA?.type === 'vaccine') {
+    const curedId = getVaccineCureTarget(pA.id, pB.id, updates)
+    if (curedId) {
+      curePlayer(curedId, updates)
+      return {
+        playerA_id: pA.id, playerB_id: pB.id,
+        winner_id: pA.id, loser_id: curedId === pA.id ? pB.id : curedId,
+        event: 'vaccine', cured_id: curedId,
+        totalA: 0, totalB: 0
+      }
+    }
+    return resolveNumeric(pA, pB, cardsA, cardsB, updates)
   }
-  if (specialB?.type === 'zombie' && specialA?.type === 'vaccine') {
-    curePlayer(pB.id, updates)  // pB holds zombie card — they get cured
-    const numeric = resolveNumeric(pA, pB, cardsA, cardsB, updates)
-    return { ...numeric, winner_id: pA.id, loser_id: pB.id, event: 'vaccine', cured_id: pB.id }
-  }
-
-  // ── STANDALONE VACCINE (self-cure or vaccine vs non-zombie) ───
-  // Vaccine is consumed and self-cure applied; event tagged 'vaccine' so game log captures it.
-  if (specialA?.type === 'vaccine' && !specialB) {
-    const wasCured = updates[pA.id].status === 'infected'
-    if (wasCured) curePlayer(pA.id, updates)
-    const numeric = resolveNumeric(pA, pB, cardsA, cardsB, updates)
-    if (wasCured) return { ...numeric, winner_id: pA.id, event: 'vaccine', cured_id: pA.id }
-    return numeric
-  }
-  if (specialB?.type === 'vaccine' && !specialA) {
-    const wasCured = updates[pB.id].status === 'infected'
-    if (wasCured) curePlayer(pB.id, updates)
-    const numeric = resolveNumeric(pA, pB, cardsA, cardsB, updates)
-    if (wasCured) return { ...numeric, winner_id: pB.id, event: 'vaccine', cured_id: pB.id }
-    return numeric
+  if (specialB?.type === 'vaccine') {
+    const curedId = getVaccineCureTarget(pB.id, pA.id, updates)
+    if (curedId) {
+      curePlayer(curedId, updates)
+      return {
+        playerA_id: pA.id, playerB_id: pB.id,
+        winner_id: pB.id, loser_id: curedId === pB.id ? pA.id : curedId,
+        event: 'vaccine', cured_id: curedId,
+        totalA: 0, totalB: 0
+      }
+    }
+    return resolveNumeric(pA, pB, cardsA, cardsB, updates)
   }
 
   // ── ZOMBIE → INFECTION ────────────────────────────────────
   if (specialA?.type === 'zombie') {
     if (updates[pB.id].status === 'alive') {
-      infectPlayer(pB.id, pA.id, updates)
+      infectPlayer(pB.id, pA.id, cardsB, updates)
       updates[pA.id].infections_caused += 1
       return {
         playerA_id: pA.id, playerB_id: pB.id,
@@ -466,7 +476,7 @@ function resolvePair(
   }
   if (specialB?.type === 'zombie') {
     if (updates[pA.id].status === 'alive') {
-      infectPlayer(pA.id, pB.id, updates)
+      infectPlayer(pA.id, pB.id, cardsA, updates)
       updates[pB.id].infections_caused += 1
       return {
         playerA_id: pA.id, playerB_id: pB.id,
@@ -507,40 +517,40 @@ function resolveNumeric(
   const winner = totalA > totalB ? pA : pB
   const loser  = totalA > totalB ? pB : pA
 
-  // Steal a random number card from loser
+  // Pure numeric loss removes one number card from the loser. If the loser
+  // already spent a shotgun/vaccine in this duel, that used special card is the
+  // loss and no extra number card is removed.
   const loserHand = updates[loser.id].hand
-  const stealable = loserHand.filter(c => c.type === 'number' && !c.used)
-  let stolenCard: Card | null = null
+  const loserCards = loser.id === pA.id ? cardsA : cardsB
+  const loserUsedSpecial = loserCards.some(c => c.type === 'shotgun' || c.type === 'vaccine')
+  let lostCard: Card | null = null
 
-  if (stealable.length > 0) {
-    stolenCard = stealable[Math.floor(Math.random() * stealable.length)]
-    updates[loser.id].hand = loserHand.filter(c => c.id !== stolenCard!.id)
-    const newCard: Card = { ...stolenCard, id: crypto.randomUUID() }
-    updates[winner.id].hand = [...updates[winner.id].hand, newCard]
-    if (updates[winner.id].hand.length > 7) {
-      updates[winner.id].hand = updates[winner.id].hand.slice(0, 7)
+  if (!loserUsedSpecial) {
+    lostCard = pickNumberForRemoval(loserHand, loserCards)
+    if (lostCard) {
+      updates[loser.id].hand = loserHand.filter(c => c.id !== lostCard!.id)
     }
-    updates[winner.id].cards_stolen += 1
   }
 
   return {
     playerA_id: pA.id, playerB_id: pB.id,
     winner_id: winner.id, loser_id: loser.id,
     event: 'numeric', totalA, totalB,
-    stolen_card: stolenCard
+    stolen_card: null
   }
 }
 
 // ── HELPERS ──────────────────────────────────────────────────
 
-function consumeCards(
+function consumeUsedSpecialCards(
   playerId: string,
   playedCards: Card[],
   updates: Record<string, PlayerUpdate>
 ) {
-  // Remove played cards EXCEPT zombie — zombie stays until cured/eliminated
+  // Shotgun/vaccine are single-use cards and vanish once committed.
+  // Number and zombie cards are handled by the duel result.
   const consumedIds = new Set(
-    playedCards.filter(c => c.type !== 'zombie').map(c => c.id)
+    playedCards.filter(c => c.type === 'shotgun' || c.type === 'vaccine').map(c => c.id)
   )
   updates[playerId].hand = updates[playerId].hand.filter(c => !consumedIds.has(c.id))
 }
@@ -548,6 +558,7 @@ function consumeCards(
 function infectPlayer(
   targetId: string,
   infectorId: string,
+  targetCommittedCards: Card[],
   updates: Record<string, PlayerUpdate>
 ) {
   // Create a NEW zombie card for the target — infector keeps their own zombie card
@@ -559,15 +570,16 @@ function infectPlayer(
     used: false,
   }
   const hand = [...updates[targetId].hand]
-  // Remove one normal card to keep hand at 7 max
-  const normalIdx = hand.findIndex(c => c.type === 'number')
-  if (normalIdx >= 0) hand.splice(normalIdx, 1)
-  hand.push(newZombieCard)
+  const replacedCard = pickNumberForRemoval(hand, targetCommittedCards)
+  const reducedHand = replacedCard
+    ? hand.filter(c => c.id !== replacedCard.id)
+    : hand.filter((_, index) => index !== 0)
+  reducedHand.push(newZombieCard)
 
   updates[targetId].status = 'infected'
   updates[targetId].infector_id = infectorId
   updates[targetId].infection_rounds = 1
-  updates[targetId].hand = hand
+  updates[targetId].hand = reducedHand.slice(-7)
 }
 
 function curePlayer(
@@ -602,6 +614,35 @@ function isZombieThreat(
   return (
     updates[player.id].status === 'infected' ||
     updates[player.id].hand.some(c => c.type === 'zombie' && !c.used)
+  )
+}
+
+function getVaccineCureTarget(
+  vaccineHolderId: string,
+  opponentId: string,
+  updates: Record<string, PlayerUpdate>
+): string | null {
+  if (isZombieThreatById(opponentId, updates)) return opponentId
+  if (isZombieThreatById(vaccineHolderId, updates)) return vaccineHolderId
+  return null
+}
+
+function isZombieThreatById(
+  playerId: string,
+  updates: Record<string, PlayerUpdate>
+): boolean {
+  return (
+    updates[playerId].status === 'infected' ||
+    updates[playerId].hand.some(c => c.type === 'zombie' && !c.used)
+  )
+}
+
+function pickNumberForRemoval(hand: Card[], committedCards: Card[]): Card | null {
+  const committedIds = new Set(committedCards.map(c => c.id))
+  return (
+    hand.find(c => committedIds.has(c.id) && c.type === 'number') ??
+    hand.find(c => c.type === 'number') ??
+    null
   )
 }
 
