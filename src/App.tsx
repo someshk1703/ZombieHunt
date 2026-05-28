@@ -59,16 +59,18 @@ function BGMController() {
 
 function AppRoutes() {
   return (
-    <Routes>
-      <Route path="/" element={<Home />} />
-      <Route path="/lobby/create" element={<ProtectedRoute><CreateRoom /></ProtectedRoute>} />
-      <Route path="/quickplay" element={<ProtectedRoute><QuickPlay /></ProtectedRoute>} />
-      <Route path="/room/:code" element={<WaitingRoom />} />
-      <Route path="/game/:code" element={<ProtectedRoute><Game /></ProtectedRoute>} />
-      <Route path="/results/:code" element={<ProtectedRoute><Results /></ProtectedRoute>} />
-      <Route path="*" element={<Navigate to="/" replace />} />
+    <>
       <BGMController />
-    </Routes>
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/lobby/create" element={<ProtectedRoute><CreateRoom /></ProtectedRoute>} />
+        <Route path="/quickplay" element={<ProtectedRoute><QuickPlay /></ProtectedRoute>} />
+        <Route path="/room/:code" element={<WaitingRoom />} />
+        <Route path="/game/:code" element={<ProtectedRoute><Game /></ProtectedRoute>} />
+        <Route path="/results/:code" element={<ProtectedRoute><Results /></ProtectedRoute>} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </>
   )
 }
 
