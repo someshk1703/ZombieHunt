@@ -393,10 +393,11 @@ function resolvePair(
   if (specialA) updates[pA.id].special_cards_played += 1
   if (specialB) updates[pB.id].special_cards_played += 1
 
-  // Remove played cards from hand EXCEPT zombie
-  // Zombie stays until cured by vaccine or eliminated by shotgun
-  consumeCards(pA.id, cardsA, updates)
-  consumeCards(pB.id, cardsB, updates)
+  // Only shotgun/vaccine vanish immediately on use.
+  // Number cards stay unless the player loses a numeric duel; zombie cards stay
+  // until cured by vaccine or the player is eliminated.
+  consumeUsedSpecialCards(pA.id, cardsA, updates)
+  consumeUsedSpecialCards(pB.id, cardsB, updates)
 
   // ── SHOTGUN ───────────────────────────────────────────────
   // Eliminates any opponent holding a zombie card OR with infected status
@@ -428,42 +429,41 @@ function resolvePair(
     return resolveNumeric(pA, pB, cardsA, cardsB, updates)
   }
 
-  // ── ZOMBIE vs VACCINE ─────────────────────────────────────
-  // Rule: vaccine cures the ZOMBIE CARD HOLDER (the infected player), not the vaccine player.
-  // Scenario 1/2 Round 2: D plays zombie, B plays vaccine → D becomes normal.
-  // winner_id is explicitly set to the VACCINE HOLDER so actor_id in game events is correct.
-  if (specialA?.type === 'zombie' && specialB?.type === 'vaccine') {
-    curePlayer(pA.id, updates)  // pA holds zombie card — they get cured
-    const numeric = resolveNumeric(pA, pB, cardsA, cardsB, updates)
-    return { ...numeric, winner_id: pB.id, loser_id: pA.id, event: 'vaccine', cured_id: pA.id }
+  // ── VACCINE ───────────────────────────────────────────────
+  // Vaccine cures the infected/zombie-card holder in the duel, even if that
+  // player did not commit their zombie card. Prefer curing the opponent; fall
+  // back to self-cure if the vaccine holder is infected.
+  if (specialA?.type === 'vaccine') {
+    const curedId = getVaccineCureTarget(pA.id, pB.id, updates)
+    if (curedId) {
+      curePlayer(curedId, updates)
+      return {
+        playerA_id: pA.id, playerB_id: pB.id,
+        winner_id: pA.id, loser_id: curedId === pA.id ? pB.id : curedId,
+        event: 'vaccine', cured_id: curedId,
+        totalA: 0, totalB: 0
+      }
+    }
+    return resolveNumeric(pA, pB, cardsA, cardsB, updates)
   }
-  if (specialB?.type === 'zombie' && specialA?.type === 'vaccine') {
-    curePlayer(pB.id, updates)  // pB holds zombie card — they get cured
-    const numeric = resolveNumeric(pA, pB, cardsA, cardsB, updates)
-    return { ...numeric, winner_id: pA.id, loser_id: pB.id, event: 'vaccine', cured_id: pB.id }
-  }
-
-  // ── STANDALONE VACCINE (self-cure or vaccine vs non-zombie) ───
-  // Vaccine is consumed and self-cure applied; event tagged 'vaccine' so game log captures it.
-  if (specialA?.type === 'vaccine' && !specialB) {
-    const wasCured = updates[pA.id].status === 'infected'
-    if (wasCured) curePlayer(pA.id, updates)
-    const numeric = resolveNumeric(pA, pB, cardsA, cardsB, updates)
-    if (wasCured) return { ...numeric, winner_id: pA.id, event: 'vaccine', cured_id: pA.id }
-    return numeric
-  }
-  if (specialB?.type === 'vaccine' && !specialA) {
-    const wasCured = updates[pB.id].status === 'infected'
-    if (wasCured) curePlayer(pB.id, updates)
-    const numeric = resolveNumeric(pA, pB, cardsA, cardsB, updates)
-    if (wasCured) return { ...numeric, winner_id: pB.id, event: 'vaccine', cured_id: pB.id }
-    return numeric
+  if (specialB?.type === 'vaccine') {
+    const curedId = getVaccineCureTarget(pB.id, pA.id, updates)
+    if (curedId) {
+      curePlayer(curedId, updates)
+      return {
+        playerA_id: pA.id, playerB_id: pB.id,
+        winner_id: pB.id, loser_id: curedId === pB.id ? pA.id : curedId,
+        event: 'vaccine', cured_id: curedId,
+        totalA: 0, totalB: 0
+      }
+    }
+    return resolveNumeric(pA, pB, cardsA, cardsB, updates)
   }
 
   // ── ZOMBIE → INFECTION ────────────────────────────────────
   if (specialA?.type === 'zombie') {
     if (updates[pB.id].status === 'alive') {
-      infectPlayer(pB.id, pA.id, updates)
+      infectPlayer(pB.id, pA.id, cardsB, updates)
       updates[pA.id].infections_caused += 1
       return {
         playerA_id: pA.id, playerB_id: pB.id,
@@ -476,7 +476,7 @@ function resolvePair(
   }
   if (specialB?.type === 'zombie') {
     if (updates[pA.id].status === 'alive') {
-      infectPlayer(pA.id, pB.id, updates)
+      infectPlayer(pA.id, pB.id, cardsA, updates)
       updates[pB.id].infections_caused += 1
       return {
         playerA_id: pA.id, playerB_id: pB.id,
@@ -517,40 +517,40 @@ function resolveNumeric(
   const winner = totalA > totalB ? pA : pB
   const loser  = totalA > totalB ? pB : pA
 
-  // Steal a random number card from loser
+  // Pure numeric loss removes one number card from the loser. If the loser
+  // already spent a shotgun/vaccine in this duel, that used special card is the
+  // loss and no extra number card is removed.
   const loserHand = updates[loser.id].hand
-  const stealable = loserHand.filter(c => c.type === 'number' && !c.used)
-  let stolenCard: Card | null = null
+  const loserCards = loser.id === pA.id ? cardsA : cardsB
+  const loserUsedSpecial = loserCards.some(c => c.type === 'shotgun' || c.type === 'vaccine')
+  let lostCard: Card | null = null
 
-  if (stealable.length > 0) {
-    stolenCard = stealable[Math.floor(Math.random() * stealable.length)]
-    updates[loser.id].hand = loserHand.filter(c => c.id !== stolenCard!.id)
-    const newCard: Card = { ...stolenCard, id: crypto.randomUUID() }
-    updates[winner.id].hand = [...updates[winner.id].hand, newCard]
-    if (updates[winner.id].hand.length > 7) {
-      updates[winner.id].hand = updates[winner.id].hand.slice(0, 7)
+  if (!loserUsedSpecial) {
+    lostCard = pickNumberForRemoval(loserHand, loserCards)
+    if (lostCard) {
+      updates[loser.id].hand = loserHand.filter(c => c.id !== lostCard!.id)
     }
-    updates[winner.id].cards_stolen += 1
   }
 
   return {
     playerA_id: pA.id, playerB_id: pB.id,
     winner_id: winner.id, loser_id: loser.id,
     event: 'numeric', totalA, totalB,
-    stolen_card: stolenCard
+    stolen_card: null
   }
 }
 
 // ── HELPERS ──────────────────────────────────────────────────
 
-function consumeCards(
+function consumeUsedSpecialCards(
   playerId: string,
   playedCards: Card[],
   updates: Record<string, PlayerUpdate>
 ) {
-  // Remove played cards EXCEPT zombie — zombie stays until cured/eliminated
+  // Shotgun/vaccine are single-use cards and vanish once committed.
+  // Number and zombie cards are handled by the duel result.
   const consumedIds = new Set(
-    playedCards.filter(c => c.type !== 'zombie').map(c => c.id)
+    playedCards.filter(c => c.type === 'shotgun' || c.type === 'vaccine').map(c => c.id)
   )
   updates[playerId].hand = updates[playerId].hand.filter(c => !consumedIds.has(c.id))
 }
@@ -558,6 +558,7 @@ function consumeCards(
 function infectPlayer(
   targetId: string,
   infectorId: string,
+  targetCommittedCards: Card[],
   updates: Record<string, PlayerUpdate>
 ) {
   // Create a NEW zombie card for the target — infector keeps their own zombie card
@@ -569,15 +570,16 @@ function infectPlayer(
     used: false,
   }
   const hand = [...updates[targetId].hand]
-  // Remove one normal card to keep hand at 7 max
-  const normalIdx = hand.findIndex(c => c.type === 'number')
-  if (normalIdx >= 0) hand.splice(normalIdx, 1)
-  hand.push(newZombieCard)
+  const replacedCard = pickNumberForRemoval(hand, targetCommittedCards)
+  const reducedHand = replacedCard
+    ? hand.filter(c => c.id !== replacedCard.id)
+    : hand.filter((_, index) => index !== 0)
+  reducedHand.push(newZombieCard)
 
   updates[targetId].status = 'infected'
   updates[targetId].infector_id = infectorId
   updates[targetId].infection_rounds = 1
-  updates[targetId].hand = hand
+  updates[targetId].hand = reducedHand.slice(-7)
 }
 
 function curePlayer(
@@ -612,6 +614,35 @@ function isZombieThreat(
   return (
     updates[player.id].status === 'infected' ||
     updates[player.id].hand.some(c => c.type === 'zombie' && !c.used)
+  )
+}
+
+function getVaccineCureTarget(
+  vaccineHolderId: string,
+  opponentId: string,
+  updates: Record<string, PlayerUpdate>
+): string | null {
+  if (isZombieThreatById(opponentId, updates)) return opponentId
+  if (isZombieThreatById(vaccineHolderId, updates)) return vaccineHolderId
+  return null
+}
+
+function isZombieThreatById(
+  playerId: string,
+  updates: Record<string, PlayerUpdate>
+): boolean {
+  return (
+    updates[playerId].status === 'infected' ||
+    updates[playerId].hand.some(c => c.type === 'zombie' && !c.used)
+  )
+}
+
+function pickNumberForRemoval(hand: Card[], committedCards: Card[]): Card | null {
+  const committedIds = new Set(committedCards.map(c => c.id))
+  return (
+    hand.find(c => committedIds.has(c.id) && c.type === 'number') ??
+    hand.find(c => c.type === 'number') ??
+    null
   )
 }
 
