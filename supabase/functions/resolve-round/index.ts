@@ -607,10 +607,12 @@ function isZombieThreat(
 
 function selectBotCard(hand: Card[]): Card[] {
   const unused = hand.filter(c => !c.used)
-  const special = unused.find(c => c.type !== 'number')
-  if (special) return [special]
+  // Bots always play number cards — special cards (shotgun/vaccine) require deliberate
+  // player intent and should never be auto-selected to avoid breaking the one-use rule
   const num = unused.find(c => c.type === 'number')
-  return num ? [num] : (hand.length > 0 ? [hand[0]] : [])
+  if (num) return [num]
+  // Absolute last resort: play any unused card (should not normally happen)
+  return unused.length > 0 ? [unused[0]] : (hand.length > 0 ? [hand[0]] : [])
 }
 
 // ── WIN CONDITION ─────────────────────────────────────────────

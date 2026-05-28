@@ -131,7 +131,15 @@ export function GameProvider({ room, initialPlayers, gameState: initialGameState
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'players', filter: `room_id=eq.${room.id}` }, payload => {
         const updated = payload.new as GamePlayer
         setPlayers(prev => prev.map(p => p.id === updated.id ? updated : p))
-        if (updated.id === myPlayer.id) setMyPlayer(updated)
+        if (updated.id === myPlayer.id) {
+          setMyPlayer(updated)
+          // Redundant setMyHand: ensures hand syncs even if the myplayer channel missed the event
+          const rawHand = (updated as unknown as { hand: unknown }).hand
+          const parsedHand: Card[] = Array.isArray(rawHand)
+            ? (rawHand as Card[])
+            : (typeof rawHand === 'string' ? JSON.parse(rawHand) : [])
+          setMyHand(parsedHand)
+        }
       })
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'players', filter: `room_id=eq.${room.id}` }, payload => {
         setPlayers(prev => prev.filter(p => p.id !== (payload.old as GamePlayer).id))
@@ -139,6 +147,31 @@ export function GameProvider({ room, initialPlayers, gameState: initialGameState
       .subscribe()
     return () => { supabase.removeChannel(channel) }
   }, [room.id, myPlayer.id])
+
+  // Force-pull own player row from DB at the start of every new round (blind_action).
+  // This is a pull-based fallback so a missed Realtime event can never leave the
+  // player with a stale hand (e.g. consumed shotgun/vaccine still showing, or
+  // zombie card missing after infection).
+  useEffect(() => {
+    if (gameState.phase !== 'blind_action') return
+    supabase
+      .from('players')
+      .select('*')
+      .eq('id', myPlayer.id)
+      .single()
+      .then(({ data }) => {
+        if (!data) return
+        const p = data as GamePlayer
+        setMyPlayer(p)
+        const rawHand = (p as unknown as { hand: unknown }).hand
+        const parsedHand: Card[] = Array.isArray(rawHand)
+          ? (rawHand as Card[])
+          : (typeof rawHand === 'string' ? JSON.parse(rawHand) : [])
+        setMyHand(parsedHand)
+      })
+  // Trigger on every blind_action start (round_number changes with each new round)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gameState.phase, gameState.round_number])
 
   async function refreshPlayers() {
     const { data } = await supabase.from('players').select('*').eq('room_id', room.id)

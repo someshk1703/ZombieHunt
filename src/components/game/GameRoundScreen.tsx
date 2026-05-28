@@ -264,7 +264,10 @@ export default function GameRoundScreen() {
   async function doCommit(cards: Card[]) {
     setCommitted(true)
     try {
-      await supabase.rpc('commit_cards', { p_room_id: room.id, p_cards: JSON.stringify(cards) })
+      // Pass the array directly (not JSON.stringify) so the Supabase client
+      // sends a proper JSONB array.  The card id values must survive the round-trip
+      // so consumeCards in resolve-round can match them against the player's hand.
+      await supabase.rpc('commit_cards', { p_room_id: room.id, p_cards: cards as unknown as Record<string, unknown>[] })
     } catch {
       setCommitted(false)
       showToast('Failed to commit. Try again.', 'error')
