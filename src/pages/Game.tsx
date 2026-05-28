@@ -104,6 +104,15 @@ function GamePhaseRouter() {
   const isByePlayer = gameState.bye_player_id === myPlayer.id
   const canPlayRound = myPlayer.status !== 'eliminated' && !isByePlayer
 
+  if (isGhost && !showDeathScreen) {
+    return (
+      <div style={{ position: 'relative', minHeight: '100vh' }}>
+        <AtmosphericBackground />
+        <GhostOverlay />
+      </div>
+    )
+  }
+
   return (
     <div style={{ position: 'relative', minHeight: '100vh' }}>
       <AtmosphericBackground />
@@ -113,7 +122,6 @@ function GamePhaseRouter() {
           onDone={() => setShowDeathScreen(false)}
         />
       )}
-      {isGhost && !showDeathScreen && <GhostOverlay />}
       {!showDeathScreen && (
         <>
           {gameState.phase === 'deal' && <DealingScreen />}
