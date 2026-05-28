@@ -25,9 +25,25 @@ interface RoundOutcome {
   playerA_id: string
   playerB_id: string
   winner_id: string | null
-  event: 'numeric' | 'infection' | 'elimination' | 'draw' | 'vaccine_cure'
-  infectorId?: string
-  curedId?: string
+  loser_id?: string | null
+  event: 'numeric' | 'infection' | 'elimination' | 'draw' | 'vaccine'
+  infector_id?: string
+  infected_id?: string
+  cured_id?: string
+  eliminated_id?: string
+}
+
+interface GameEvent {
+  id: string
+  room_id: string
+  round_number: number
+  event_type: 'infection' | 'elimination' | 'vaccine_used' | 'card_stolen' | 'game_end'
+  actor_id: string | null
+  target_id: string | null
+  actor_username: string | null
+  target_username: string | null
+  metadata: Record<string, unknown>
+  created_at: string
 }
 
 interface RoundLogEntry {
@@ -80,9 +96,9 @@ function computeStats(roundLogs: RoundLogEntry[]): Record<string, PlayerStats> {
         }
       }
       // Infections caused
-      if (o.event === 'infection' && o.infectorId) {
-        ensure(o.infectorId)
-        map[o.infectorId].infections_caused++
+      if (o.event === 'infection' && o.infector_id) {
+        ensure(o.infector_id)
+        map[o.infector_id].infections_caused++
       }
       // Special cards played: any non-numeric event means at least one special card was used
       if (o.event === 'infection' || o.event === 'elimination') {
@@ -101,6 +117,7 @@ export default function Results() {
   const [players, setPlayers] = useState<PlayerRow[]>([])
   const [gameState, setGameState] = useState<GameStateResult | null>(null)
   const [roundLogs, setRoundLogs] = useState<RoundLogEntry[]>([])
+  const [events, setEvents] = useState<GameEvent[]>([])
   const [stats, setStats] = useState<Record<string, PlayerStats>>({})
   const [tab, setTab] = useState<Tab>('scoreboard')
   const [loading, setLoading] = useState(true)
@@ -111,13 +128,14 @@ export default function Results() {
       const { data: room } = await supabase.from('rooms').select('*').eq('code', code!.toUpperCase()).single()
       if (!room) { navigate('/'); return }
 
-      const [{ data: ps }, { data: gs }, { data: logs }] = await Promise.all([
+      const [{ data: ps }, { data: gs }, { data: logs }, { data: evts }] = await Promise.all([
         supabase.from('players')
           .select('id, user_id, username, avatar_url, status, is_host, is_bot, elimination_round, elimination_cause, rounds_survived, infections_caused, special_cards_played, cards_stolen')
           .eq('room_id', room.id)
           .order('rounds_survived', { ascending: false }),
         supabase.from('game_state').select('round_number,winner_faction,winner_player_id').eq('room_id', room.id).single(),
         supabase.from('round_log').select('round_number,outcomes').eq('room_id', room.id).order('round_number', { ascending: true }),
+        supabase.from('game_events').select('*').eq('room_id', room.id).order('created_at', { ascending: true }),
       ])
 
       if (ps) {
@@ -146,6 +164,7 @@ export default function Results() {
           return hasDbStats ? prev : computeStats(parsed)
         })
       }
+      if (evts) setEvents(evts as GameEvent[])
       setLoading(false)
     }
     load()
@@ -272,27 +291,46 @@ export default function Results() {
 
           interface StoryLine { round: number; text: string; color: string }
           const storyLines: StoryLine[] = []
-          for (const log of roundLogs) {
-            for (const o of log.outcomes) {
-              const a = playerMap[o.playerA_id] ?? 'Unknown'
-              const b = playerMap[o.playerB_id] ?? 'Unknown'
-              const winnerName = o.winner_id ? (playerMap[o.winner_id] ?? 'Unknown') : null
-              const loserName = winnerName ? (winnerName === a ? b : a) : null
-              if (o.event === 'infection') {
-                const infectorName = o.infectorId ? (playerMap[o.infectorId] ?? 'Unknown') : (winnerName ?? a)
-                const infectedName = infectorName === a ? b : a
-                storyLines.push({ round: log.round_number, text: `${infectorName} played a zombie card, infecting ${infectedName}`, color: 'var(--color-green)' })
-              } else if (o.event === 'vaccine_cure') {
-                const curedName = o.curedId ? (playerMap[o.curedId] ?? 'Unknown') : (winnerName === a ? b : a)
-                const healer = winnerName ?? a
-                storyLines.push({ round: log.round_number, text: `${healer} administered a vaccine, curing ${curedName}`, color: '#4499ff' })
-              } else if (o.event === 'elimination') {
-                storyLines.push({ round: log.round_number, text: `${winnerName} fired a shotgun, eliminating ${loserName}`, color: 'var(--color-red)' })
-              } else if (o.event === 'draw') {
-                storyLines.push({ round: log.round_number, text: `${a} and ${b} played equally — no winner`, color: 'var(--color-text-muted)' })
-              } else {
-                const msg = winnerName ? `${winnerName} outplayed ${loserName} in a card duel` : `${a} and ${b} clashed`
-                storyLines.push({ round: log.round_number, text: msg, color: 'var(--color-warning)' })
+
+          // Primary: use game_events (written by new resolve-round, includes usernames)
+          const storyEvents = events.filter(e => e.event_type !== 'game_end')
+          if (storyEvents.length > 0) {
+            for (const e of storyEvents) {
+              const actor = e.actor_username ?? 'Unknown'
+              const target = e.target_username ?? 'Unknown'
+              if (e.event_type === 'infection') {
+                storyLines.push({ round: e.round_number, text: `${actor} played a zombie card, infecting ${target}`, color: 'var(--color-green)' })
+              } else if (e.event_type === 'elimination') {
+                storyLines.push({ round: e.round_number, text: `${actor} fired a shotgun, eliminating ${target}`, color: 'var(--color-red)' })
+              } else if (e.event_type === 'vaccine_used') {
+                storyLines.push({ round: e.round_number, text: `${actor} administered a vaccine, curing ${target}`, color: '#4499ff' })
+              }
+              // card_stolen events intentionally omitted for readability
+            }
+          } else {
+            // Fallback: derive from round_log outcomes (older game data)
+            for (const log of roundLogs) {
+              for (const o of log.outcomes) {
+                const a = playerMap[o.playerA_id] ?? 'Unknown'
+                const b = playerMap[o.playerB_id] ?? 'Unknown'
+                const winnerName = o.winner_id ? (playerMap[o.winner_id] ?? 'Unknown') : null
+                const loserName = winnerName ? (winnerName === a ? b : a) : null
+                if (o.event === 'infection') {
+                  const infectorName = o.infector_id ? (playerMap[o.infector_id] ?? 'Unknown') : (winnerName ?? a)
+                  const infectedName = o.infected_id ? (playerMap[o.infected_id] ?? 'Unknown') : (infectorName === a ? b : a)
+                  storyLines.push({ round: log.round_number, text: `${infectorName} played a zombie card, infecting ${infectedName}`, color: 'var(--color-green)' })
+                } else if (o.event === 'vaccine') {
+                  const curedName = o.cured_id ? (playerMap[o.cured_id] ?? 'Unknown') : (winnerName === a ? b : a)
+                  const healer = winnerName ?? a
+                  storyLines.push({ round: log.round_number, text: `${healer} administered a vaccine, curing ${curedName}`, color: '#4499ff' })
+                } else if (o.event === 'elimination') {
+                  storyLines.push({ round: log.round_number, text: `${winnerName} fired a shotgun, eliminating ${loserName}`, color: 'var(--color-red)' })
+                } else if (o.event === 'draw') {
+                  storyLines.push({ round: log.round_number, text: `${a} and ${b} played equally — no winner`, color: 'var(--color-text-muted)' })
+                } else {
+                  const msg = winnerName ? `${winnerName} outplayed ${loserName} in a card duel` : `${a} and ${b} clashed`
+                  storyLines.push({ round: log.round_number, text: msg, color: 'var(--color-warning)' })
+                }
               }
             }
           }
