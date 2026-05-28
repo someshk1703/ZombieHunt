@@ -419,13 +419,15 @@ function resolvePair(
   }
 
   // ── ZOMBIE vs VACCINE ─────────────────────────────────────
+  // Rule: vaccine cures the ZOMBIE CARD HOLDER (the infected player), not the vaccine player.
+  // Scenario 1/2 Round 2: D plays zombie, B plays vaccine → D becomes normal.
   if (specialA?.type === 'zombie' && specialB?.type === 'vaccine') {
-    curePlayer(pB.id, updates)
-    return { ...resolveNumeric(pA, pB, cardsA, cardsB, updates), event: 'vaccine', cured_id: pB.id }
+    curePlayer(pA.id, updates)  // pA holds zombie card and is infected — they get cured
+    return { ...resolveNumeric(pA, pB, cardsA, cardsB, updates), event: 'vaccine', cured_id: pA.id }
   }
   if (specialB?.type === 'zombie' && specialA?.type === 'vaccine') {
-    curePlayer(pA.id, updates)
-    return { ...resolveNumeric(pA, pB, cardsA, cardsB, updates), event: 'vaccine', cured_id: pA.id }
+    curePlayer(pB.id, updates)  // pB holds zombie card and is infected — they get cured
+    return { ...resolveNumeric(pA, pB, cardsA, cardsB, updates), event: 'vaccine', cured_id: pB.id }
   }
 
   // ── STANDALONE VACCINE (self-cure) ────────────────────────
