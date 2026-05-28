@@ -296,14 +296,19 @@ export default function Results() {
           const storyEvents = events.filter(e => e.event_type !== 'game_end')
           if (storyEvents.length > 0) {
             for (const e of storyEvents) {
-              const actor = e.actor_username ?? 'Unknown'
-              const target = e.target_username ?? 'Unknown'
+              // Prefer stored username; fall back to id→playerMap lookup; last resort 'Unknown'
+              const actor = e.actor_username ?? playerMap[e.actor_id ?? ''] ?? 'Unknown'
+              const target = e.target_username ?? playerMap[e.target_id ?? ''] ?? 'Unknown'
               if (e.event_type === 'infection') {
                 storyLines.push({ round: e.round_number, text: `${actor} played a zombie card, infecting ${target}`, color: 'var(--color-green)' })
               } else if (e.event_type === 'elimination') {
-                storyLines.push({ round: e.round_number, text: `${actor} fired a shotgun, eliminating ${target}`, color: 'var(--color-red)' })
+                const cause = (e.metadata?.cause as string) ?? 'shotgun'
+                const verb = cause === 'shotgun' ? 'fired a shotgun, eliminating' : 'eliminated'
+                storyLines.push({ round: e.round_number, text: `${actor} ${verb} ${target}`, color: 'var(--color-red)' })
               } else if (e.event_type === 'vaccine_used') {
-                storyLines.push({ round: e.round_number, text: `${actor} administered a vaccine, curing ${target}`, color: '#4499ff' })
+                // actor = vaccine user, target = the player who was cured
+                const actorLabel = actor === target ? actor : `${actor} → ${target}`
+                storyLines.push({ round: e.round_number, text: `${actorLabel} used a vaccine — ${target} is cured`, color: '#4499ff' })
               }
               // card_stolen events intentionally omitted for readability
             }
@@ -320,9 +325,11 @@ export default function Results() {
                   const infectedName = o.infected_id ? (playerMap[o.infected_id] ?? 'Unknown') : (infectorName === a ? b : a)
                   storyLines.push({ round: log.round_number, text: `${infectorName} played a zombie card, infecting ${infectedName}`, color: 'var(--color-green)' })
                 } else if (o.event === 'vaccine') {
-                  const curedName = o.cured_id ? (playerMap[o.cured_id] ?? 'Unknown') : (winnerName === a ? b : a)
-                  const healer = winnerName ?? a
-                  storyLines.push({ round: log.round_number, text: `${healer} administered a vaccine, curing ${curedName}`, color: '#4499ff' })
+                  // winner_id is now set to the vaccine holder; cured_id is who was cured
+                  const healerName = o.winner_id ? (playerMap[o.winner_id] ?? 'Unknown') : (winnerName ?? a)
+                  const curedName = o.cured_id ? (playerMap[o.cured_id] ?? 'Unknown') : (healerName === a ? b : a)
+                  const label = healerName === curedName ? healerName : `${healerName} → ${curedName}`
+                  storyLines.push({ round: log.round_number, text: `${label} used a vaccine — ${curedName} is cured`, color: '#4499ff' })
                 } else if (o.event === 'elimination') {
                   storyLines.push({ round: log.round_number, text: `${winnerName} fired a shotgun, eliminating ${loserName}`, color: 'var(--color-red)' })
                 } else if (o.event === 'draw') {
