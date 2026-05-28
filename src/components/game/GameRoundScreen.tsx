@@ -403,18 +403,10 @@ export default function GameRoundScreen() {
         />
 
         {/* Battlefield: opponent + player zones */}
-          <div style={{ flex: 1, display: 'flex', transition: 'margin-left 200ms', marginLeft: chatOpen ? '260px' : '32px', position: 'relative' }}>
-            {/* Zone divider */}
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', transition: 'margin-left 200ms', marginLeft: chatOpen ? '320px' : '32px', position: 'relative', overflowY: 'auto' }}>
+            {/* OPPONENT ZONE (TOP) */}
             <div style={{
-              position: 'absolute', top: 0, bottom: 0, left: '50%',
-              width: '1px',
-              background: 'linear-gradient(180deg, transparent 0%, rgba(204,0,0,0.3) 30%, rgba(204,0,0,0.3) 70%, transparent 100%)',
-              boxShadow: '0 0 16px rgba(204,0,0,0.15)',
-              pointerEvents: 'none', zIndex: 2,
-            }} />
-            {/* OPPONENT ZONE */}
-            <div style={{
-              flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px',
+              flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px',
               background: 'linear-gradient(160deg, rgba(28,10,10,0.7) 0%, rgba(18,8,8,0.5) 100%)',
               border: '1px solid rgba(204,0,0,0.14)',
               boxShadow: 'inset 0 0 40px rgba(0,0,0,0.3)',
@@ -480,9 +472,11 @@ export default function GameRoundScreen() {
             )}
           </div>
 
-          {/* PLAYER ZONE (YOU) */}
+          {/* Zone divider — horizontal */}
+            <div style={{ height: '1px', flexShrink: 0, background: 'linear-gradient(90deg, transparent 0%, rgba(204,0,0,0.4) 20%, rgba(204,0,0,0.4) 80%, transparent 100%)', boxShadow: '0 0 16px rgba(204,0,0,0.15)', pointerEvents: 'none' }} />
+          {/* PLAYER ZONE (YOU — BOTTOM) */}
             <div style={{
-              flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px',
+              flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px',
               background: 'linear-gradient(200deg, rgba(10,20,10,0.7) 0%, rgba(8,16,8,0.5) 100%)',
               border: '1px solid rgba(0,255,65,0.1)',
               boxShadow: 'inset 0 0 40px rgba(0,0,0,0.3)',

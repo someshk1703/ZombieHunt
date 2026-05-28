@@ -15,6 +15,10 @@ interface PlayerRow {
   is_bot: boolean
   elimination_round: number | null
   elimination_cause: string | null
+  rounds_survived: number
+  infections_caused: number
+  special_cards_played: number
+  cards_stolen: number
 }
 
 interface RoundOutcome {
@@ -108,12 +112,27 @@ export default function Results() {
       if (!room) { navigate('/'); return }
 
       const [{ data: ps }, { data: gs }, { data: logs }] = await Promise.all([
-        supabase.from('players').select('*').eq('room_id', room.id),
+        supabase.from('players')
+          .select('id, user_id, username, avatar_url, status, is_host, is_bot, elimination_round, elimination_cause, rounds_survived, infections_caused, special_cards_played, cards_stolen')
+          .eq('room_id', room.id)
+          .order('rounds_survived', { ascending: false }),
         supabase.from('game_state').select('round_number,winner_faction,winner_player_id').eq('room_id', room.id).single(),
         supabase.from('round_log').select('round_number,outcomes').eq('room_id', room.id).order('round_number', { ascending: true }),
       ])
 
-      if (ps) setPlayers(ps as PlayerRow[])
+      if (ps) {
+        setPlayers(ps as PlayerRow[])
+        // Build stats map from DB player columns (written by resolve-round)
+        const dbStats: Record<string, PlayerStats> = {}
+        for (const p of ps as PlayerRow[]) {
+          dbStats[p.id] = {
+            rounds_survived: p.rounds_survived ?? 0,
+            infections_caused: p.infections_caused ?? 0,
+            special_cards_played: p.special_cards_played ?? 0,
+          }
+        }
+        setStats(dbStats)
+      }
       if (gs) setGameState(gs as GameStateResult)
       if (logs) {
         const parsed: RoundLogEntry[] = (logs as { round_number: number; outcomes: unknown }[]).map(l => ({
@@ -121,7 +140,11 @@ export default function Results() {
           outcomes: (typeof l.outcomes === 'string' ? JSON.parse(l.outcomes) : l.outcomes) as RoundOutcome[],
         }))
         setRoundLogs(parsed)
-        setStats(computeStats(parsed))
+        // Fallback: if DB stats are all zeros (old game data), compute from round_log
+        setStats(prev => {
+          const hasDbStats = Object.values(prev).some(s => s.rounds_survived > 0)
+          return hasDbStats ? prev : computeStats(parsed)
+        })
       }
       setLoading(false)
     }
