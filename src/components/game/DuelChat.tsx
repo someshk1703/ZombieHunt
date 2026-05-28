@@ -92,12 +92,12 @@ export default function DuelChat({ isOpen, onToggle, opponent, isNegotiating, my
       {isOpen ? (
         <motion.div
           key="open"
-          initial={{ x: -260 }}
+          initial={{ x: -320 }}
           animate={{ x: 0 }}
-          exit={{ x: -260 }}
+          exit={{ x: -320 }}
           transition={{ duration: 0.2 }}
           style={{
-            position: 'absolute', left: 0, top: 0, bottom: 0, width: '260px', zIndex: 5,
+            position: 'absolute', left: 0, top: 0, bottom: 0, width: '320px', zIndex: 5,
             background: '#1E1E24', borderRight: '1px solid var(--color-border)',
             backdropFilter: 'blur(4px)', display: 'flex', flexDirection: 'column',
           }}

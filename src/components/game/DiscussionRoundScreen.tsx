@@ -247,15 +247,14 @@ export default function DiscussionRoundScreen() {
       </div>
 
       {/* BODY */}
-      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden', justifyContent: 'center' }}>
         {/* LEFT — Global Chat */}
         <div
           style={{
-            flex: 1,
+            flex: '0 1 680px',
             display: 'flex',
             flexDirection: 'column',
             borderRight: '1px solid #383838',
-            maxWidth: '680px',
           }}
         >
           {/* Emoji reactions bar */}
