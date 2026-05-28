@@ -630,7 +630,7 @@ function selectBotCard(hand: Card[]): Card[] {
 function checkWin(players: Player[], roundNumber: number, totalRounds: number): WinResult {
   const active = players.filter(p => p.status !== 'eliminated')
 
-  // 0. All players eliminated in the same round (e.g. simultaneous shotgun)
+  // 0. All players eliminated simultaneously (e.g. mutual shotgun)
   if (active.length === 0) {
     return { gameOver: true, winnerFaction: null, winnerPlayerId: null }
   }
@@ -644,7 +644,7 @@ function checkWin(players: Player[], roundNumber: number, totalRounds: number): 
     !(p.hand ?? []).some(c => c.type === 'zombie' && !c.used)
   )
 
-  // 1. No zombie threats remain → humanity prevails
+  // 1. No zombie threats remain — humanity prevailed (any round)
   if (zombieThreats.length === 0) {
     return {
       gameOver: true,
@@ -653,44 +653,26 @@ function checkWin(players: Player[], roundNumber: number, totalRounds: number): 
     }
   }
 
-  // 2. No clean humans remain → zombie apocalypse
+  // 2. No clean humans remain — zombie apocalypse (any round)
   if (cleanHumans.length === 0) {
     return { gameOver: true, winnerFaction: 'zombies', winnerPlayerId: null }
   }
 
-  // 3. THE DEAD MAN WALK — exactly one human left against any number of zombies.
-  //    The last survivor wins for humanity regardless of zombie count.
-  if (cleanHumans.length === 1) {
-    return {
-      gameOver: true,
-      winnerFaction: 'humans',
-      winnerPlayerId: cleanHumans[0].id,
-    }
-  }
-
-  // 4. Humans outnumber zombie threats → humans win (containment achieved)
-  if (zombieThreats.length < cleanHumans.length) {
-    return {
-      gameOver: true,
-      winnerFaction: 'humans',
-      winnerPlayerId: null, // multiple humans remain; no individual winner
-    }
-  }
-
-  // 5. Zombies outnumber clean humans → tipping point; zombies win
-  if (cleanHumans.length < zombieThreats.length) {
-    return { gameOver: true, winnerFaction: 'zombies', winnerPlayerId: null }
-  }
-
-  // 6. Final round with tied counts → majority determines winner.
-  //    Humans win on exact tie (they survived to the end).
+  // 3-5 only apply at the FINAL round — applying these mid-game would end the
+  // game after round 1 in most configurations (e.g. 1 zombie vs 3 humans always
+  // makes humans the "majority" immediately).
   if (roundNumber >= totalRounds) {
-    if (cleanHumans.length >= zombieThreats.length) {
+    // THE DEAD MAN WALK — last human standing beats any number of zombies
+    if (cleanHumans.length === 1) {
       return {
         gameOver: true,
         winnerFaction: 'humans',
-        winnerPlayerId: cleanHumans.length === 1 ? cleanHumans[0].id : null,
+        winnerPlayerId: cleanHumans[0].id,
       }
+    }
+    // Majority determines winner; humans win on exact tie (survived to the end)
+    if (cleanHumans.length >= zombieThreats.length) {
+      return { gameOver: true, winnerFaction: 'humans', winnerPlayerId: null }
     }
     return { gameOver: true, winnerFaction: 'zombies', winnerPlayerId: null }
   }
