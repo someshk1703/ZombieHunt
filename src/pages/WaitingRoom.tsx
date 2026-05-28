@@ -5,7 +5,6 @@ import QRCode from 'qrcode'
 import { useGameStore } from '../store/gameStore'
 import { supabase } from '../lib/supabase'
 import { useToast } from '../components/Toast'
-import { audioManager } from '../lib/audio'
 import AtmosphericBackground from '../components/AtmosphericBackground'
 import LobbyChat from '../components/LobbyChat'
 import SettingsDrawer from '../components/SettingsDrawer'
@@ -98,14 +97,6 @@ export default function WaitingRoom() {
       color: { dark: '#0a0a0a', light: '#e8e8e8' },
     }).then(setQrDataUrl).catch(() => {})
   }, [room?.code])
-
-  // Start lobby ambient on first user interaction
-  useEffect(() => {
-    const start = () => { audioManager.playAmbient('lobby'); document.removeEventListener('click', start); document.removeEventListener('touchstart', start) }
-    document.addEventListener('click', start, { once: true })
-    document.addEventListener('touchstart', start, { once: true })
-    return () => { audioManager.stopAmbient(); document.removeEventListener('click', start); document.removeEventListener('touchstart', start) }
-  }, [])
 
   // ── Initial data fetch ────────────────────────────────────────────────────
   useEffect(() => {

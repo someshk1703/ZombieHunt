@@ -367,6 +367,10 @@ class AudioManager {
 
   setVolume(category: keyof typeof this.volumes, value: number): void {
     this.volumes[category] = Math.max(0, Math.min(1, value))
+    if (category === 'music' || category === 'master') {
+      const targetVol = this.volumes.music * this.volumes.master * 0.18
+      if (this.bgm && !this.bgm.paused) this.bgm.volume = targetVol
+    }
     if (category === 'music' && this.ambientMaster && this.ctx) {
       this.ambientMaster.gain.value = this.volumes.music * this.volumes.master * 0.12
     }
@@ -375,7 +379,8 @@ class AudioManager {
 
   setMuted(muted: boolean): void {
     this.muted = muted
-    if (muted) { this.stopAmbient() }
+    if (muted) { this.stopAmbient(); this.stopBGM(500) }
+    else if (this.bgmShouldPlay) { this.playBGM() }
     this.saveToStorage()
   }
 
@@ -429,6 +434,62 @@ class AudioManager {
     } catch { /* ignore */ }
     this.ambientNodes = []
     this.ambientMaster = null
+  }
+
+  // ── File-based BGM (game.mp3) ─────────────────────────────────────────────
+  private bgm: HTMLAudioElement | null = null
+  private bgmFadeTimer: ReturnType<typeof setInterval> | null = null
+  private bgmShouldPlay = false
+
+  playBGM(): void {
+    this.bgmShouldPlay = true
+    if (this.muted) return
+    if (!this.bgm) {
+      this.bgm = new Audio('/assets/music/game.mp3')
+      this.bgm.loop = true
+      this.bgm.volume = 0
+    }
+    if (this.bgmFadeTimer) { clearInterval(this.bgmFadeTimer); this.bgmFadeTimer = null }
+    const targetVol = this.volumes.music * this.volumes.master * 0.18
+    this.bgm.play().catch(() => {
+      // Autoplay blocked — will retry on next user interaction via retryBGM()
+    })
+    // Fade in over 2.5s
+    const steps = 50
+    const stepMs = 2500 / steps
+    const stepVol = targetVol / steps
+    this.bgmFadeTimer = setInterval(() => {
+      if (!this.bgm) return
+      const next = Math.min(targetVol, this.bgm.volume + stepVol)
+      this.bgm.volume = next
+      if (next >= targetVol) { clearInterval(this.bgmFadeTimer!); this.bgmFadeTimer = null }
+    }, stepMs)
+  }
+
+  stopBGM(fadeMs = 1500): void {
+    this.bgmShouldPlay = false
+    if (!this.bgm) return
+    if (this.bgmFadeTimer) { clearInterval(this.bgmFadeTimer); this.bgmFadeTimer = null }
+    const startVol = this.bgm.volume
+    const steps = Math.max(1, Math.round(fadeMs / 50))
+    const stepVol = startVol / steps
+    this.bgmFadeTimer = setInterval(() => {
+      if (!this.bgm) return
+      const next = Math.max(0, this.bgm.volume - stepVol)
+      this.bgm.volume = next
+      if (next <= 0) {
+        this.bgm.pause()
+        clearInterval(this.bgmFadeTimer!)
+        this.bgmFadeTimer = null
+      }
+    }, 50)
+  }
+
+  // Call after first user gesture to unblock autoplay
+  retryBGM(): void {
+    if (this.bgmShouldPlay && this.bgm && this.bgm.paused && !this.muted) {
+      this.bgm.play().catch(() => {})
+    }
   }
 
   isMuted(): boolean { return this.muted }

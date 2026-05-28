@@ -1,8 +1,9 @@
-import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
-import { useEffect } from 'react'
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
+import { useEffect, useRef } from 'react'
 import { useAuth } from './lib/auth'
 import { useGameStore } from './store/gameStore'
 import { syncServerTime } from './lib/supabase'
+import { audioManager } from './lib/audio'
 import { ToastProvider } from './components/Toast'
 import AtmosphericBackground from './components/AtmosphericBackground'
 import LoadingScreen from './components/LoadingScreen'
@@ -24,6 +25,38 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
+function BGMController() {
+  const location = useLocation()
+  const unlockedRef = useRef(false)
+
+  useEffect(() => {
+    const isPlayZone = location.pathname.startsWith('/game/')
+    if (isPlayZone) {
+      audioManager.stopBGM()
+    } else {
+      audioManager.playBGM()
+    }
+  }, [location.pathname])
+
+  // Retry BGM after first user gesture (browser autoplay policy)
+  useEffect(() => {
+    const onGesture = () => {
+      if (!unlockedRef.current) {
+        unlockedRef.current = true
+        audioManager.retryBGM()
+      }
+    }
+    window.addEventListener('click', onGesture, { capture: true })
+    window.addEventListener('touchstart', onGesture, { capture: true })
+    return () => {
+      window.removeEventListener('click', onGesture, true)
+      window.removeEventListener('touchstart', onGesture, true)
+    }
+  }, [])
+
+  return null
+}
+
 function AppRoutes() {
   return (
     <Routes>
@@ -34,6 +67,7 @@ function AppRoutes() {
       <Route path="/game/:code" element={<ProtectedRoute><Game /></ProtectedRoute>} />
       <Route path="/results/:code" element={<ProtectedRoute><Results /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
+      <BGMController />
     </Routes>
   )
 }
