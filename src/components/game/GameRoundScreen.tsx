@@ -69,6 +69,7 @@ export default function GameRoundScreen() {
   const [myPairDone, setMyPairDone] = useState(false)
   const [hasSeenMyResult, setHasSeenMyResult] = useState(false)
   const revealCalledRef = useRef(false)
+  const prevStatusRef = useRef<string>(myPlayer.status)
 
   // Reset local state when round advances
   useEffect(() => {
@@ -224,7 +225,7 @@ export default function GameRoundScreen() {
     }
   }, [gameState.committed_cards, gameState.pairs, gameState.phase, isHost, players, room.id, gameState.round_number])
 
-  // Subscribe to private infection channel
+  // Subscribe to private infection channel (broadcast fallback)
   useEffect(() => {
     if (!user) return
     const ch = supabase.channel(`private:${user.id}`)
@@ -234,6 +235,22 @@ export default function GameRoundScreen() {
       .subscribe()
     return () => { supabase.removeChannel(ch) }
   }, [user])
+
+  // Detect infection via player status change: alive → infected.
+  // This is the reliable trigger since the broadcast sender is server-side.
+  useEffect(() => {
+    const prev = prevStatusRef.current
+    prevStatusRef.current = myPlayer.status
+    if (prev === 'alive' && myPlayer.status === 'infected') {
+      const infectorId = (myPlayer as unknown as { infector_id?: string }).infector_id
+      const infector = infectorId ? players.find(p => p.id === infectorId) : null
+      setInfectionPayload({
+        infector_username: infector?.username ?? 'Unknown',
+        round: gameState.round_number,
+      })
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [myPlayer.status])
 
   const autoCommit = useCallback(async () => {
     if (committed) return
