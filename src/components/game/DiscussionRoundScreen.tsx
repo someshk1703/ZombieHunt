@@ -33,6 +33,13 @@ export default function DiscussionRoundScreen() {
   const alivePlayers = players.filter(p => p.status === 'alive' || p.status === 'infected')
   const totalRounds = (room.settings as unknown as { total_rounds?: number }).total_rounds ?? 10
 
+  function getPublicStatus(player: typeof players[number]): 'alive' | 'infected' | 'eliminated' {
+    if (player.status === 'eliminated') return 'eliminated'
+    const roundsInfected = (player as unknown as { infection_rounds?: number }).infection_rounds ?? 0
+    const infectionRevealed = room.settings.infection_visibility && roundsInfected > 1
+    return infectionRevealed ? 'infected' : 'alive'
+  }
+
   // Load existing discussion chat
   useEffect(() => {
     supabase
@@ -475,14 +482,16 @@ export default function DiscussionRoundScreen() {
               gap: '10px',
             }}
           >
-            {alivePlayers.map(p => (
+            {alivePlayers.map(p => {
+              const publicStatus = getPublicStatus(p)
+              return (
               <motion.div
                 key={p.id}
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 style={{
                   background: 'var(--color-surface)',
-                  border: `1px solid ${p.status === 'infected' ? 'rgba(0,255,65,0.3)' : 'var(--color-border)'}`,
+                  border: `1px solid ${publicStatus === 'infected' ? 'rgba(0,255,65,0.3)' : 'var(--color-border)'}`,
                   padding: '10px',
                   display: 'flex',
                   flexDirection: 'column',
@@ -516,9 +525,10 @@ export default function DiscussionRoundScreen() {
                 >
                   {p.username}
                 </span>
-                <PlayerStatusBadge status={p.status === 'eliminated' ? 'eliminated' : p.status === 'infected' ? 'infected' : 'alive'} size="sm" />
+                <PlayerStatusBadge status={publicStatus} size="sm" />
               </motion.div>
-            ))}
+              )
+            })}
           </div>
         </div>
       </div>

@@ -252,9 +252,19 @@ Deno.serve(async (req: Request) => {
     }
 
     // ── 7. WRITE ROUND LOG ──────────────────────────────────
+    const firstOutcome = outcomes[0] ?? null
+    if (!firstOutcome) {
+      throw new Error('Round log insert failed: no pair outcomes were produced for this round')
+    }
     const { error: roundLogError } = await supabase.from('round_log').insert({
       room_id,
       round_number,
+      player_a_id: firstOutcome.playerA_id,
+      player_b_id: firstOutcome.playerB_id,
+      card_a: committedByPlayerId[firstOutcome.playerA_id] ?? null,
+      card_b: committedByPlayerId[firstOutcome.playerB_id] ?? null,
+      winner_id: firstOutcome.winner_id,
+      outcome: firstOutcome.event,
       outcomes,
       created_at: new Date().toISOString()
     })
