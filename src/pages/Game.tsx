@@ -16,9 +16,22 @@ import GhostOverlay from '../components/game/GhostOverlay'
 import DeathScreen from '../components/game/DeathScreen'
 import DiscussionRoundScreen from '../components/game/DiscussionRoundScreen'
 
-function ByeWaitingScreen({ players, roundNumber }: { players: GamePlayer[]; roundNumber: number }) {
+function ByeWaitingScreen({
+  players,
+  roundNumber,
+  infectionVisibility,
+}: {
+  players: GamePlayer[]
+  roundNumber: number
+  infectionVisibility: boolean
+}) {
   const alive = players.filter(p => p.status !== 'eliminated' && p.user_id !== '00000000-0000-0000-0000-000000000000')
   const competing = alive
+
+  function getPublicStatus(player: GamePlayer): 'alive' | 'infected' {
+    const roundsInfected = (player as unknown as { infection_rounds?: number }).infection_rounds ?? 0
+    return infectionVisibility && roundsInfected > 1 ? 'infected' : 'alive'
+  }
 
   return (
     <div style={{
@@ -71,18 +84,23 @@ function ByeWaitingScreen({ players, roundNumber }: { players: GamePlayer[]; rou
         maxWidth: '360px',
       }}>
         {competing.map(p => (
+          (() => {
+            const publicStatus = getPublicStatus(p)
+            return (
           <div key={p.id} style={{
             fontSize: '10px',
             letterSpacing: '0.1em',
-            color: p.status === 'infected' ? 'var(--color-zombie, #4ade80)' : 'var(--color-text-muted)',
+            color: publicStatus === 'infected' ? 'var(--color-zombie, #4ade80)' : 'var(--color-text-muted)',
             padding: '4px 10px',
             border: '1px solid',
-            borderColor: p.status === 'infected' ? 'var(--color-zombie, #4ade80)' : 'rgba(255,255,255,0.15)',
+            borderColor: publicStatus === 'infected' ? 'var(--color-zombie, #4ade80)' : 'rgba(255,255,255,0.15)',
             borderRadius: '4px',
             textTransform: 'uppercase',
           }}>
             {p.username}
           </div>
+            )
+          })()
         ))}
       </div>
     </div>
@@ -90,7 +108,7 @@ function ByeWaitingScreen({ players, roundNumber }: { players: GamePlayer[]; rou
 }
 
 function GamePhaseRouter() {
-  const { gameState, myPlayer, isGhost, players } = useGame()
+  const { gameState, myPlayer, isGhost, players, room } = useGame()
   const wasEliminatedRef = useRef(false)
   const [showDeathScreen, setShowDeathScreen] = useState(false)
 
@@ -128,7 +146,7 @@ function GamePhaseRouter() {
           {gameState.phase === 'hand_review' && <HandReviewScreen />}
           {gameState.phase === 'blind_action' && canPlayRound && <GameRoundScreen />}
           {gameState.phase === 'blind_action' && isByePlayer && myPlayer.status !== 'eliminated' && (
-            <ByeWaitingScreen players={players} roundNumber={gameState.round_number} />
+            <ByeWaitingScreen players={players} roundNumber={gameState.round_number} infectionVisibility={room.settings.infection_visibility} />
           )}
           {gameState.phase === 'reveal' && <RevealScreen />}
           {gameState.phase === 'elimination_check' && <EliminationCheckScreen />}

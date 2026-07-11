@@ -3,6 +3,7 @@ dist/
 dist-ssr/
 build/
 .vite/
+.specify/
 
 # Environment variables
 .env
@@ -12,8 +13,6 @@ build/
 # Editor
 .vscode/
 .idea/
-.DS_Store
-Thumbs.db
 
 # TypeScript
 *.tsbuildinfo
@@ -34,5 +33,29 @@ coverage/
 # mdFiles — documentation prompts, excluded from repo
 mdFiles/
 
+# Cache
+.cache/
+.eslintcache
+.stylelintcache
+
+# OS
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# Secrets / keys (never commit)
+*.pem
+*.key
+*.p12
+*.pfx
+supabase/secrets.json
+
+# GitHub Agentic Workflows
+.aw/
+
 .vercel
 package-lock.json
+
+BugFix.md
+NextStep.md
