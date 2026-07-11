@@ -37,8 +37,13 @@ network: defaults
 
 # Outputs - what APIs and tools can the AI use?
 safe-outputs:
-  create-issue:          # Creates issues (default max: 1)
-    max: 5               # Optional: specify maximum number
+  create-issue:          # Creates failure investigation issues
+    max: 3
+  add-comment:           # Comments on PRs with inline findings
+  update-issue:          # Updates existing [ci-check] issues instead of duplicating
+  noop:
+  missing-tool:
+  missing-data:
   # actions:
   # activation-comments:
   # add-comment:
@@ -105,22 +110,63 @@ safe-outputs:
 
 ---
 
-# CI Health Check
+# CI Doctor — Auto-Investigation on Failure
 
-This workflow runs on every push and pull request to `main` or `dev` branches of the ZombieHunt project (a Vite + React + TypeScript multiplayer game with Supabase backend).
+This workflow runs on every push and pull request to `main` or `dev` branches of the ZombieHunt project (a Vite + React + TypeScript multiplayer game with Supabase backend). It acts as a first-responder: when a build or type check fails, it automatically investigates, diagnoses the root cause, and creates a structured failure report.
 
-## Instructions
+## Context
 
-1. Check the repository for any recent changes in `src/`, `supabase/`, or root config files.
-2. Review TypeScript files for type errors, missing imports, or broken component references.
-3. Look for any obvious build issues such as missing environment variables, broken imports, or misconfigured Vite/Tailwind/PostCSS settings.
-4. Check if `supabase/migrations/` has any new SQL files that may conflict with existing schema in `supabase/schema.sql`.
-5. Summarize findings as a concise report:
-   - ✅ if everything looks healthy
-   - ⚠️ if there are warnings or potential issues
-   - ❌ if there are breaking problems that need attention
-6. If issues are found, create a GitHub issue titled `[ci-check] Build health issues found` with details and suggested fixes.
-7. If everything is healthy, use noop with a brief confirmation message.
+- Build command: `tsc && vite build` (via `npm run build`)
+- Type check: `npx tsc --noEmit`
+- Config files: `tsconfig.json`, `tsconfig.node.json`, `vite.config.ts`, `tailwind.config.js`, `postcss.config.js`
+- Environment variables needed: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`
+- Supabase edge functions in: `supabase/functions/`
+
+## Phase 1 — Health Scan
+
+1. Fetch the most recent commits on this branch (last 3).
+2. List changed files in the latest commit across `src/`, `supabase/`, and root config files.
+3. For each changed file category, perform a targeted scan:
+
+   **TypeScript / React (`src/`)**
+   - Look for broken imports — does every import path resolve to an existing file?
+   - Look for components using hooks outside of function components
+   - Look for missing `export` on components referenced in routes (`src/pages/`)
+   - Look for Zustand store actions called with wrong argument types
+   - Look for `useEffect` with no dependency array on Supabase subscriptions (memory leak)
+
+   **Build config (`vite.config.ts`, `tsconfig.json`)**
+   - Check if any path alias in `tsconfig.json` is missing a corresponding `vite.config.ts` resolve alias
+   - Check if `outDir` in vite config matches `outputDirectory` in `vercel.json` (`dist`)
+
+   **Supabase (`supabase/functions/`, `supabase/migrations/`)**
+   - Check if new edge function files export a default `serve()` handler
+   - Check if any migration references a table/column that doesn't exist in `supabase/schema.sql`
+
+## Phase 2 — Failure Investigation
+
+4. Search open GitHub issues for any recent `[ci-check]` issues on this repo to avoid duplicate reports.
+5. Check if the same type of failure was seen before — if a similar issue exists and is open, add a comment to it instead of creating a new one.
+6. Determine root cause category:
+   - **Type error** — TypeScript compilation failure
+   - **Import error** — missing module or wrong path
+   - **Config drift** — mismatch between tsconfig, vite config, or vercel.json
+   - **Schema conflict** — new migration conflicts with existing schema or TS types
+   - **Edge function error** — malformed Supabase edge function
+   - **Environment variable** — missing or wrong VITE_ prefix
+
+## Phase 3 — Report
+
+7. **If failures are found**, create a GitHub issue titled `[ci-check] ❌ Build failure: <root cause category> on <branch>` with:
+   - **Trigger** — which commit and which files changed caused this
+   - **Root cause** — specific file, line, and explanation of the failure
+   - **Category** — one of the 6 categories above
+   - **Reproduction steps** — exact command to reproduce locally
+   - **Suggested fix** — concrete code change or configuration fix
+   - **Similar past issues** — links to any related `[ci-check]` issues found
+   - **Severity** — 🔴 Blocks deploy / 🟡 Warning only
+
+8. **If no failures are found**, use noop with: `✅ CI health check passed on <branch> — no issues detected in changed files.`
 
 ## Notes
 

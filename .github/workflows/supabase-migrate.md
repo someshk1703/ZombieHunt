@@ -109,27 +109,49 @@ safe-outputs:
 
 ---
 
-# Supabase Migration Reviewer
+# Supabase Migration & Schema Drift Detector
 
 This workflow triggers when SQL migration files change in the ZombieHunt project (a Vite + React + TypeScript multiplayer zombie card game using Supabase as its backend).
 
-## Instructions
+## Context
 
-1. Fetch the list of recently changed files in `supabase/migrations/` from this push.
-2. Read the content of each new or modified `.sql` migration file.
+The project schema is defined in `supabase/schema.sql`. Edge functions live in `supabase/functions/`. TypeScript types that mirror DB tables are used throughout `src/` (especially `src/lib/supabase.ts`, `src/context/GameContext.tsx`, `src/store/gameStore.ts`). The README.md documents the data model.
+
+## Phase 1 — Migration Review
+
+1. Fetch the list of recently changed files in `supabase/migrations/`.
+2. Read each new or modified `.sql` migration file.
 3. Review each migration for:
-   - Syntax issues or potential errors
    - Destructive operations (DROP TABLE, DROP COLUMN, TRUNCATE) that could cause data loss
-   - Missing RLS (Row Level Security) policies for new tables
-   - Conflicts with existing schema defined in `supabase/schema.sql`
+   - Missing RLS (Row Level Security) policies for any new tables
    - Missing indexes on foreign key columns
-4. Cross-reference with `supabase/schema.sql` to verify consistency.
-5. Create a GitHub issue titled `[supabase-migrate] Migration review: <filename>` with:
-   - A summary of what the migration does
-   - Any risks or warnings found
-   - Suggested improvements if applicable
-   - A ✅ safe to apply or ⚠️ review before applying recommendation
-6. If no issues are found, post a noop confirmation that migrations look clean.
+   - Syntax errors or dangerous patterns (e.g. no WHERE clause on DELETE)
+   - Whether the migration is reversible (can it be rolled back safely?)
+
+## Phase 2 — Schema Drift Detection
+
+4. Read `supabase/schema.sql` as the source of truth for the current DB schema.
+5. Scan these TypeScript files for type definitions that mirror DB tables:
+   - `src/lib/supabase.ts`
+   - `src/context/GameContext.tsx`
+   - `src/store/gameStore.ts`
+   - Any `*.ts` or `*.tsx` file in `src/` that imports from `@supabase/supabase-js`
+6. Detect drift between schema and code:
+   - **Column drift** — columns in SQL schema not reflected in TypeScript types
+   - **Table drift** — tables in SQL with no corresponding TS interface or type
+   - **Function drift** — Supabase edge functions in `supabase/functions/` that reference columns/tables no longer in schema
+   - **README drift** — data model section in README.md that doesn't match current schema
+7. Check if any migration adds/renames/removes a column that is referenced by name in TypeScript files (string literals like `'zombie_card'`, `'player_id'`).
+
+## Phase 3 — Report
+
+8. Create a GitHub issue titled `[supabase-migrate] Schema review: <migration filename>` with:
+   - **Migration summary** — what the migration does in plain English
+   - **Drift findings** — list of each drift found across code/docs/functions with file + line references
+   - **Risk level** — 🔴 High / 🟡 Medium / 🟢 Low
+   - **Verdict** — ✅ safe to apply, ⚠️ apply but fix drift after, or 🔴 do not apply until drift is resolved
+9. If no migration changes and running via workflow_dispatch, perform a full schema drift scan across all files and report findings as an issue titled `[supabase-migrate] Full schema drift scan`.
+10. If everything is consistent, use noop with a confirmation.
 
 ## Notes
 
