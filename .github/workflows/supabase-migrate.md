@@ -6,6 +6,7 @@ on:
     paths:
       - 'supabase/migrations/**'
       - 'supabase/schema.sql'
+  workflow_dispatch:
 
 # Alternative triggers (uncomment to use):
 # on:

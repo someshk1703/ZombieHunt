@@ -3,6 +3,7 @@
 on:
   pull_request:
     types: [opened, synchronize, reopened]
+  workflow_dispatch:
 
 # Alternative triggers (uncomment to use):
 # on:
