@@ -90,6 +90,36 @@ Deno.serve(async (req) => {
     const dealSummary = await dealCards(supabase, allPlayers)
     console.log('[start-game] deal summary:', JSON.stringify({ ...dealSummary, zombiePlayers: '[REDACTED]', totalPlayers: allPlayers.length }))
 
+    // 5.5 Generate round-robin schedule
+    // Every player plays every other player exactly once.
+    // For even n: n-1 rounds; for odd n: n rounds (one bye per round).
+    function generateRoundRobinSchedule(playerIds: string[]): { rounds: string[][][]; totalRounds: number } {
+      const n = playerIds.length
+      if (n < 2) return { rounds: [], totalRounds: 0 }
+      const isOdd = n % 2 !== 0
+      const arr: (string | null)[] = isOdd ? [...playerIds, null] : [...playerIds]
+      const m = arr.length // always even
+      const totalRounds = m - 1
+      const rotating = [...arr]
+      const rounds: string[][][] = []
+      for (let r = 0; r < totalRounds; r++) {
+        const round: string[][] = []
+        for (let i = 0; i < m / 2; i++) {
+          const a = rotating[i]
+          const b = rotating[m - 1 - i]
+          if (a !== null && b !== null) round.push([a, b])
+        }
+        rounds.push(round)
+        // Rotate: keep index 0 fixed, rotate the rest
+        const last = rotating[m - 1]
+        for (let i = m - 1; i > 1; i--) rotating[i] = rotating[i - 1]
+        rotating[1] = last
+      }
+      return { rounds, totalRounds }
+    }
+
+    const { rounds: round_schedule, totalRounds: total_rounds } = generateRoundRobinSchedule(allPlayers.map(p => p.id))
+
     // 6. Create game_state with phase='deal' (15s for dealing animation + hand review)
     const phaseDeadline = new Date(Date.now() + 15000).toISOString()
     const { data: gameState, error: gsErr } = await supabase
@@ -101,9 +131,26 @@ Deno.serve(async (req) => {
         bye_player_id: null,
         committed_cards: {},
         phase_deadline: phaseDeadline,
+        round_schedule,
+        total_rounds,
       }).select().single()
 
     if (gsErr) throw gsErr
+
+    // ── LRU CLEANUP ──────────────────────────────────────────
+    // Keep only the 20 most recent finished rooms. Cascade deletes via FK will
+    // remove related players, game_state, round_log and game_events automatically.
+    const { data: oldRooms } = await supabase
+      .from('rooms')
+      .select('id, created_at')
+      .eq('status', 'finished')
+      .order('created_at', { ascending: false })
+      .range(20, 10000)                 // skip the 20 newest, grab everything older
+    if (oldRooms && oldRooms.length > 0) {
+      const oldIds = oldRooms.map((r: { id: string }) => r.id)
+      await supabase.from('rooms').delete().in('id', oldIds)
+      console.log(`[start-game] LRU cleanup: deleted ${oldIds.length} old finished room(s)`)
+    }
 
     return new Response(JSON.stringify({ success: true, game_state_id: gameState.id }), {
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },

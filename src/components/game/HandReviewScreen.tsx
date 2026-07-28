@@ -30,27 +30,53 @@ const VALUE_NAMES: Record<number, string> = {
   14: 'ACE', 13: 'KING', 12: 'QUEEN', 11: 'JACK',
 }
 
+const SPECIAL_CARD_LABELS: Record<string, string> = {
+  zombie: 'INFECT TO SURVIVE',
+  shotgun: 'FIRE AT ENEMIES',
+  vaccine: 'CURE ALLIES',
+}
+
 function cardLabel(card: Card): string {
-  if (card.type !== 'number') return 'SPECIAL'
+  if (card.type !== 'number') return SPECIAL_CARD_LABELS[card.type] ?? 'SPECIAL'
   const val = VALUE_NAMES[card.value] ?? String(card.value)
   return `${val} OF ${card.suit?.toUpperCase() ?? ''}`
 }
 
 const SUBJECT_ZERO_UUID = '00000000-0000-0000-0000-000000000000'
 
-function generatePairs(players: { id: string; user_id: string; status: string }[]) {
+function generatePairs(players: { id: string; user_id: string; status: string }[], gameState: { round_schedule?: string[][][]; round_number: number }) {
   // Subject Zero is the special bye-player bot — exclude from active pool
   const subjectZero = players.find(p => p.user_id === SUBJECT_ZERO_UUID)
-  // All alive/infected players except Subject Zero (humans + lobby bots alike)
-  const active = players.filter(
-    p => p.user_id !== SUBJECT_ZERO_UUID && (p.status === 'alive' || p.status === 'infected')
+  const aliveIds = new Set(
+    players.filter(p => p.user_id !== SUBJECT_ZERO_UUID && (p.status === 'alive' || p.status === 'infected')).map(p => p.id)
   )
+
+  // Use pre-computed round-robin schedule when available (round_number is 1-based, schedule is 0-based)
+  const scheduleIndex = gameState.round_number - 1
+  const scheduledPairs = gameState.round_schedule?.[scheduleIndex] ?? []
+
+  if (scheduledPairs.length > 0) {
+    // Filter to only alive/infected players
+    const validPairs = scheduledPairs.filter(([a, b]) => aliveIds.has(a) && aliveIds.has(b))
+    const pairedIds = new Set(validPairs.flatMap(p => p))
+    // Players whose scheduled opponent was eliminated → pair with Subject Zero or give bye
+    const unpaired = [...aliveIds].filter(id => !pairedIds.has(id))
+    if (subjectZero && unpaired.length > 0) {
+      validPairs.push([unpaired[0], subjectZero.id])
+      const bye = unpaired.length > 1 ? unpaired[1] : null
+      return { pairs: validPairs, bye }
+    }
+    const bye = unpaired.length > 0 ? unpaired[0] : null
+    return { pairs: validPairs, bye }
+  }
+
+  // Fallback: random shuffle (for games without a stored schedule)
+  const active = players.filter(p => p.user_id !== SUBJECT_ZERO_UUID && (p.status === 'alive' || p.status === 'infected'))
   const shuffled = [...active].sort(() => Math.random() - 0.5)
   const pairs: string[][] = []
   for (let i = 0; i + 1 < shuffled.length; i += 2) {
     pairs.push([shuffled[i].id, shuffled[i + 1].id])
   }
-  // Odd active count → pair last with Subject Zero, or mark as bye
   const isOdd = shuffled.length % 2 !== 0
   if (isOdd && subjectZero) {
     pairs.push([shuffled[shuffled.length - 1].id, subjectZero.id])
@@ -131,7 +157,7 @@ export default function HandReviewScreen() {
 
     // Host transitions phase
     if (isHost) {
-      const { pairs, bye } = generatePairs(players)
+      const { pairs, bye } = generatePairs(players, gameState)
       const roundTimer = room.settings.round_timer_seconds
       const negotiationDeadline = new Date(Date.now() + roundTimer * 1000).toISOString()
       const phaseDeadline = new Date(Date.now() + roundTimer * 1000 + 30000).toISOString()

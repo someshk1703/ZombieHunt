@@ -152,11 +152,38 @@ export default function GameRoundScreen() {
         const available = botHand.filter(c => !c.used)
         if (available.length === 0) continue
 
-        // Bot strategy: play lowest number card, fallback to any card
-        const numberCards = available.filter(c => c.type === 'number')
-        const pick = numberCards.length > 0
-          ? numberCards.reduce((min, c) => c.value < min.value ? c : min)
-          : available[Math.floor(Math.random() * available.length)]
+        // Find this bot's opponent in the current pairs
+        const myPair = (gameState.pairs ?? []).find((pair: string[]) => pair.includes(bot.id))
+        const opponentId = myPair?.find((id: string) => id !== bot.id)
+        const opponent = opponentId ? players.find(p => p.id === opponentId) : null
+        const opponentHand = (opponent?.hand ?? []) as Card[]
+        const opponentIsZombieThreat = opponent && (
+          opponent.status === 'infected' ||
+          opponentHand.some((c: Card) => c.type === 'zombie' && !c.used)
+        )
+        const opponentIsClean = opponent &&
+          opponent.status === 'alive' &&
+          !opponentHand.some((c: Card) => c.type === 'zombie' && !c.used)
+
+        const zombie  = available.find((c: Card) => c.type === 'zombie')
+        const shotgun = available.find((c: Card) => c.type === 'shotgun')
+        const vaccine = available.find((c: Card) => c.type === 'vaccine')
+        const numbers = available
+          .filter((c: Card) => c.type === 'number')
+          .sort((a: Card, b: Card) => b.value - a.value)
+
+        let pick: Card
+        if (zombie && opponentIsClean) {
+          pick = zombie           // spread infection
+        } else if (opponentIsZombieThreat && shotgun) {
+          pick = shotgun          // eliminate zombie threat
+        } else if (opponentIsZombieThreat && vaccine) {
+          pick = vaccine          // cure zombie threat
+        } else if (numbers.length > 0) {
+          pick = numbers[0]       // highest number card
+        } else {
+          pick = available[0]     // fallback
+        }
 
         newBotCommits[bot.user_id] = [pick]
         anyChange = true

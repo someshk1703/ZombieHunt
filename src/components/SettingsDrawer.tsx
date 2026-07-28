@@ -73,16 +73,6 @@ function SegmentedControl({ options, value, onChange }: {
   )
 }
 
-function cardDistribution(players: number) {
-  const zombieCount = Math.min(Math.max(1, Math.floor(players / 5)), players - 1)
-  const vaccineCount = Math.min(Math.max(1, Math.floor(players / 4)), players - zombieCount)
-  return {
-    zombieCount,
-    vaccineCount,
-    shotgunCount: players - zombieCount,
-  }
-}
-
 export default function SettingsDrawer({ open, onClose, roomId, currentSettings, currentPlayerCount }: SettingsDrawerProps) {
   const { showToast } = useToast()
   const [roomName, setRoomName] = useState(currentSettings.room_name ?? '')
@@ -94,7 +84,6 @@ export default function SettingsDrawer({ open, onClose, roomId, currentSettings,
   const [saving, setSaving] = useState(false)
   const [confirmKick, setConfirmKick] = useState(false)
 
-  const dist = cardDistribution(maxPlayers)
   const excessPlayers = currentPlayerCount > maxPlayers ? currentPlayerCount - maxPlayers : 0
 
   async function handleSave() {
@@ -217,7 +206,7 @@ export default function SettingsDrawer({ open, onClose, roomId, currentSettings,
                 </button>
               </div>
               <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '10px', color: 'var(--color-text-muted)' }}>
-                ↳ {dist.zombieCount} zombie · {dist.vaccineCount} vaccine · {dist.shotgunCount} shotgun cards
+                ↳ infect to survive · fire at enemies · cure allies
               </p>
               {excessPlayers > 0 && (
                 <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '10px', color: 'var(--color-red)', marginTop: '6px' }}>

@@ -176,12 +176,12 @@ Deno.serve(async (req: Request) => {
       let cardsA: Card[] = committedByPlayerId[idA] ?? []
       let cardsB: Card[] = committedByPlayerId[idB] ?? []
 
-      // Bot fallback: auto-select if no committed cards
+      // Bot fallback: auto-select if no committed cards (pass opponent state for strategy)
       if (cardsA.length === 0 && pA.user_id !== SUBJECT_ZERO_UUID) {
-        cardsA = selectBotCard(playerUpdates[pA.id].hand)
+        cardsA = selectBotCard(playerUpdates[pA.id].hand, playerUpdates[pB.id])
       }
       if (cardsB.length === 0 && pB.user_id !== SUBJECT_ZERO_UUID) {
-        cardsB = selectBotCard(playerUpdates[pB.id].hand)
+        cardsB = selectBotCard(playerUpdates[pB.id].hand, playerUpdates[pA.id])
       }
 
       const outcome = resolvePair(pA, pB, cardsA, cardsB, round_number, playerUpdates)
@@ -284,9 +284,13 @@ Deno.serve(async (req: Request) => {
     const freshPlayers = (freshPlayersRaw ?? []) as Player[]
 
     // ── 10. CHECK WIN CONDITION ─────────────────────────────
+    // Use total_rounds stored in game_state (set by start-game round-robin scheduler).
+    // Fall back to room.settings.total_rounds or 10 for games started before this change.
     const roomSettings = (room.settings ?? {}) as { total_rounds?: number }
-    const totalRounds = roomSettings.total_rounds ?? 10
-    const winResult = checkWin(freshPlayers.filter(p => !p.is_bot), round_number, totalRounds)
+    const totalRounds = (gameState as unknown as { total_rounds?: number }).total_rounds
+      ?? roomSettings.total_rounds
+      ?? 10
+    const winResult = checkWin(freshPlayers, round_number, totalRounds)
 
     if (winResult.gameOver) {
       const { error: gameEndEventError } = await supabase.from('game_events').insert({
@@ -323,32 +327,54 @@ Deno.serve(async (req: Request) => {
       }), { headers: { 'Content-Type': 'application/json', ...CORS } })
     }
 
-    // ── 11. GENERATE NEXT ROUND PAIRS (NO REPEAT MATCHUPS) ─
+    // ── 11. GENERATE NEXT ROUND PAIRS (ROUND-ROBIN SCHEDULE) ─
     const alivePlayers = freshPlayers.filter(
       p => p.status !== 'eliminated' && p.user_id !== SUBJECT_ZERO_UUID
     )
 
-    // Build matchup history from round_log to avoid repeat pairings
-    const { data: allLogs, error: allLogsError } = await supabase
-      .from('round_log').select('outcomes').eq('room_id', room_id)
-    if (allLogsError) throw new Error(`Round log history fetch failed: ${allLogsError.message}`)
+    // Try pre-computed round-robin schedule first (stored in game_state by start-game)
+    const storedSchedule = (gameState as unknown as { round_schedule?: string[][][] }).round_schedule ?? []
+    // round_number is the CURRENT round just resolved; next round index = round_number (0-based)
+    const scheduledPairs: string[][] = storedSchedule[round_number] ?? []
 
-    const playedMatchups = new Set<string>()
-    for (const log of (allLogs ?? [])) {
-      const outs: Array<{ playerA_id?: string; playerB_id?: string }> =
-        typeof log.outcomes === 'string'
-          ? JSON.parse(log.outcomes)
-          : (log.outcomes ?? [])
-      for (const o of outs) {
-        if (o.playerA_id && o.playerB_id) {
-          playedMatchups.add([o.playerA_id, o.playerB_id].sort().join('|'))
+    let newPairs: string[][]
+    let bye: string | null
+
+    if (scheduledPairs.length > 0) {
+      // Filter out pairs where either player has been eliminated
+      const aliveIds = new Set(alivePlayers.map(p => p.id))
+      const validPairs = scheduledPairs.filter(([a, b]) => aliveIds.has(a) && aliveIds.has(b))
+      const pairedIds = new Set(validPairs.flatMap(p => p))
+
+      // Players in the schedule but whose opponent was eliminated → try pairing with Subject Zero
+      const unpaired = alivePlayers.filter(p => !pairedIds.has(p.id))
+      if (subjectZero && unpaired.length > 0) {
+        // Pair the first unpaired with Subject Zero; rest get a bye
+        validPairs.push([unpaired[0].id, subjectZero.id])
+        bye = unpaired.length > 1 ? unpaired[1].id : null
+      } else {
+        bye = unpaired.length > 0 ? unpaired[0].id : null
+      }
+
+      newPairs = validPairs
+    } else {
+      // Fallback: greedy no-repeat algorithm (for games without a stored schedule)
+      const { data: allLogs, error: allLogsError } = await supabase
+        .from('round_log').select('outcomes').eq('room_id', room_id)
+      if (allLogsError) throw new Error(`Round log history fetch failed: ${allLogsError.message}`)
+      const playedMatchups = new Set<string>()
+      for (const log of (allLogs ?? [])) {
+        const outs: Array<{ playerA_id?: string; playerB_id?: string }> =
+          typeof log.outcomes === 'string' ? JSON.parse(log.outcomes) : (log.outcomes ?? [])
+        for (const o of outs) {
+          if (o.playerA_id && o.playerB_id)
+            playedMatchups.add([o.playerA_id, o.playerB_id].sort().join('|'))
         }
       }
+      const fallback = generatePairsNoRepeat(alivePlayers, playedMatchups, subjectZero)
+      newPairs = fallback.pairs
+      bye = fallback.bye
     }
-
-    const { pairs: newPairs, bye } = generatePairsNoRepeat(
-      alivePlayers, playedMatchups, subjectZero
-    )
 
     // ── TRANSITION TO DISCUSSION ───────────────────────────
     // After resolving, advance to discussion phase so players can see results
@@ -409,6 +435,16 @@ function resolvePair(
   consumeUsedSpecialCards(pA.id, cardsA, updates)
   consumeUsedSpecialCards(pB.id, cardsB, updates)
 
+  // ── ZOMBIE vs ZOMBIE ─────────────────────────────────────
+  // Both players play zombie cards — mutual stalemate, draw, no infection.
+  if (specialA?.type === 'zombie' && specialB?.type === 'zombie') {
+    return {
+      playerA_id: pA.id, playerB_id: pB.id,
+      winner_id: null, loser_id: null,
+      event: 'draw', totalA: 0, totalB: 0
+    }
+  }
+
   // ── SHOTGUN ───────────────────────────────────────────────
   // Eliminates any opponent holding a zombie card OR with infected status
   if (specialA?.type === 'shotgun') {
@@ -440,9 +476,10 @@ function resolvePair(
   }
 
   // ── VACCINE ───────────────────────────────────────────────
-  // Vaccine cures the infected/zombie-card holder in the duel, even if that
-  // player did not commit their zombie card. Prefer curing the opponent; fall
-  // back to self-cure if the vaccine holder is infected.
+  // Vaccine cures the OPPONENT if they are a zombie threat (infected status or
+  // hold a zombie card), even if they did not commit the zombie card this round.
+  // Self-cure is forbidden — if the opponent is not a zombie threat the vaccine
+  // is wasted (card removed, duel falls through to numeric).
   if (specialA?.type === 'vaccine') {
     const curedId = getVaccineCureTarget(pA.id, pB.id, updates)
     if (curedId) {
@@ -527,18 +564,22 @@ function resolveNumeric(
   const winner = totalA > totalB ? pA : pB
   const loser  = totalA > totalB ? pB : pA
 
-  // Pure numeric loss removes one number card from the loser. If the loser
-  // already spent a shotgun/vaccine in this duel, that used special card is the
-  // loss and no extra number card is removed.
-  const loserHand = updates[loser.id].hand
+  // Numeric loss: remove one number card from the loser's hand.
+  // Exception: if the loser already spent a shotgun or vaccine this duel,
+  // that consumed special is their "loss" — no additional number card removed.
+  const loserHand = [...updates[loser.id].hand]
   const loserCards = loser.id === pA.id ? cardsA : cardsB
   const loserUsedSpecial = loserCards.some(c => c.type === 'shotgun' || c.type === 'vaccine')
-  let lostCard: Card | null = null
 
   if (!loserUsedSpecial) {
-    lostCard = pickNumberForRemoval(loserHand, loserCards)
-    if (lostCard) {
-      updates[loser.id].hand = loserHand.filter(c => c.id !== lostCard!.id)
+    // Prefer removing the exact card the loser committed; fall back to any number card.
+    const committedIds = new Set(loserCards.map(c => c.id))
+    const cardToRemove =
+      loserHand.find(c => committedIds.has(c.id) && c.type === 'number') ??
+      loserHand.find(c => c.type === 'number') ??
+      null
+    if (cardToRemove) {
+      updates[loser.id].hand = loserHand.filter(c => c.id !== cardToRemove.id)
     }
   }
 
@@ -628,12 +669,12 @@ function isZombieThreat(
 }
 
 function getVaccineCureTarget(
-  vaccineHolderId: string,
+  _vaccineHolderId: string,
   opponentId: string,
   updates: Record<string, PlayerUpdate>
 ): string | null {
+  // Self-cure is forbidden. Vaccine only works on the opponent.
   if (isZombieThreatById(opponentId, updates)) return opponentId
-  if (isZombieThreatById(vaccineHolderId, updates)) return vaccineHolderId
   return null
 }
 
@@ -656,19 +697,44 @@ function pickNumberForRemoval(hand: Card[], committedCards: Card[]): Card | null
   )
 }
 
-function selectBotCard(hand: Card[]): Card[] {
+function selectBotCard(hand: Card[], opponentUpdate?: PlayerUpdate): Card[] {
   const unused = hand.filter(c => !c.used)
-  // Bots always play number cards — special cards (shotgun/vaccine) require deliberate
-  // player intent and should never be auto-selected to avoid breaking the one-use rule
-  const num = unused.find(c => c.type === 'number')
-  if (num) return [num]
-  // Absolute last resort: play any unused card (should not normally happen)
+  const zombie  = unused.find(c => c.type === 'zombie')
+  const shotgun = unused.find(c => c.type === 'shotgun')
+  const vaccine = unused.find(c => c.type === 'vaccine')
+  const numbers = unused.filter(c => c.type === 'number').sort((a, b) => b.value - a.value)
+
+  const opponentIsZombieThreat = opponentUpdate && (
+    opponentUpdate.status === 'infected' ||
+    opponentUpdate.hand.some(c => c.type === 'zombie' && !c.used)
+  )
+  const opponentIsClean = opponentUpdate &&
+    opponentUpdate.status === 'alive' &&
+    !opponentUpdate.hand.some(c => c.type === 'zombie' && !c.used)
+
+  // Bot is infected / holds zombie card → try to spread infection to a clean opponent
+  if (zombie && opponentIsClean) return [zombie]
+
+  // Opponent is a zombie threat → eliminate with shotgun, or cure with vaccine
+  if (opponentIsZombieThreat) {
+    if (shotgun) return [shotgun]
+    if (vaccine) return [vaccine]
+  }
+
+  // Default: play the highest number card available
+  if (numbers.length > 0) return [numbers[0]]
+
+  // Last resort: any unused card
   return unused.length > 0 ? [unused[0]] : (hand.length > 0 ? [hand[0]] : [])
 }
 
 // ── WIN CONDITION ─────────────────────────────────────────────
 //
 // Rules (checked in priority order):
+//
+// Bots ARE included in the population — they count as clean players until
+// infected, and as zombie threats once they hold a zombie card. This prevents
+// a 1-human game from ending immediately when that human is the zombie.
 //
 //  0. All eliminated simultaneously        → draw (no winner)
 //  1. zombieThreats === 0                  → Humans win (all threats gone)
@@ -704,24 +770,25 @@ function checkWin(players: Player[], roundNumber: number, totalRounds: number): 
     }
   }
 
-  // 2. No clean humans remain — zombie apocalypse (any round)
-  if (cleanHumans.length === 0) {
-    return { gameOver: true, winnerFaction: 'zombies', winnerPlayerId: null }
-  }
-
-  // 3-5 only apply at the FINAL round — applying these mid-game would end the
-  // game after round 1 in most configurations (e.g. 1 zombie vs 3 humans always
-  // makes humans the "majority" immediately).
+  // 2–5 only apply at the FINAL round. Mid-game, the configured round count must
+  // be respected so the game always runs all rounds (e.g. infecting the only bot
+  // in a 1-human game shouldn't end the game before the final round).
   if (roundNumber >= totalRounds) {
-    // THE DEAD MAN WALK — last human standing beats any number of zombies
-    if (cleanHumans.length === 1) {
+    // 2. No clean players remain — zombie apocalypse
+    if (cleanHumans.length === 0) {
+      return { gameOver: true, winnerFaction: 'zombies', winnerPlayerId: null }
+    }
+    // 3. THE DEAD MAN WALK — only applies when the lone clean survivor is a real
+    // human player (not a bot). A single bot remaining against multiple zombies
+    // is resolved by majority rule instead.
+    if (cleanHumans.length === 1 && !cleanHumans[0].is_bot) {
       return {
         gameOver: true,
         winnerFaction: 'humans',
         winnerPlayerId: cleanHumans[0].id,
       }
     }
-    // Majority determines winner; humans win on exact tie (survived to the end)
+    // 4/5. Majority determines winner; humans win on exact tie (survived to the end)
     if (cleanHumans.length >= zombieThreats.length) {
       return { gameOver: true, winnerFaction: 'humans', winnerPlayerId: null }
     }

@@ -42,11 +42,31 @@ export async function dealCards(
   const lobbyBots = players.filter(p => p.is_bot && p.user_id !== SUBJECT_ZERO_UUID)
 
   const eligibleCount = specialEligible.length
-  // At least 1 zombie for any game (3–9 eligible), +1 every 5 more
-  const zombieCount = Math.min(Math.max(1, Math.floor(eligibleCount / 5)), Math.max(1, eligibleCount - 1))
-  // At least 1 vaccine for any game (3–7 eligible), +1 every 4 more
-  // Upper bound: can't exceed non-zombie players (0 if all eligibles are zombies)
-  const vaccineCount = Math.min(Math.max(1, Math.floor(eligibleCount / 4)), eligibleCount - zombieCount)
+
+  // ── CARD COUNT TABLES ──────────────────────────────────────
+  function getZombieCount(n: number): number {
+    if (n <= 5) return 1
+    if (n <= 8) return 2
+    if (n <= 12) return 3
+    if (n <= 15) return 4
+    if (n <= 17) return 5
+    return 6
+  }
+  function getShotgunCount(n: number): number {
+    if (n <= 8) return 2
+    const z = getZombieCount(n)
+    if (n <= 17) return z - 1
+    return z
+  }
+  function getVaccineCount(n: number): number {
+    if (n <= 7) return 2
+    if (n <= 15) return 3
+    return 4
+  }
+
+  const zombieCount  = Math.min(getZombieCount(eligibleCount),  Math.max(1, eligibleCount - 1))
+  const shotgunCount = Math.min(getShotgunCount(eligibleCount), eligibleCount - zombieCount)
+  const vaccineCount = Math.min(getVaccineCount(eligibleCount), eligibleCount - zombieCount)
 
   const shuffledEligible = shuffle(specialEligible)
 
@@ -63,11 +83,13 @@ export async function dealCards(
     playerHands[pid].push({ id: crypto.randomUUID(), type: 'zombie', value: 15, suit: null, used: false })
   }
 
-  // Shotgun cards — all eligible non-zombies (NOT lobby bots)
-  for (const p of specialEligible) {
-    if (!zombiePlayerIds.has(p.id)) {
-      playerHands[p.id].push({ id: crypto.randomUUID(), type: 'shotgun', value: 0, suit: null, used: false })
-    }
+  // Shotgun cards — random subset of non-zombie eligible players
+  const nonZombieEligible = shuffle(specialEligible.filter(p => !zombiePlayerIds.has(p.id)))
+  const shotgunPlayerIds = new Set<string>()
+  for (let i = 0; i < Math.min(shotgunCount, nonZombieEligible.length); i++) {
+    const pid = nonZombieEligible[i].id
+    shotgunPlayerIds.add(pid)
+    playerHands[pid].push({ id: crypto.randomUUID(), type: 'shotgun', value: 0, suit: null, used: false })
   }
 
   // Vaccine cards — shuffle eligible non-zombies, first vaccineCount get one

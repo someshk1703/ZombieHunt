@@ -72,16 +72,6 @@ export default function WaitingRoom() {
   const [qrDataUrl, setQrDataUrl] = useState('')
   const [kickConfirmId, setKickConfirmId] = useState<string | null>(null)
 
-  function cardDistribution(count: number) {
-    const zombieCount = Math.min(Math.max(1, Math.floor(count / 5)), count - 1)
-    const vaccineCount = Math.min(Math.max(1, Math.floor(count / 4)), count - zombieCount)
-    return {
-      zombieCount,
-      vaccineCount,
-      shotgunCount: count - zombieCount,
-    }
-  }
-
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const isHost = useMemo(() => players.find(p => p.user_id === user?.id)?.is_host ?? false, [players, user])
   const myPlayer = useMemo(() => players.find(p => p.user_id === user?.id), [players, user])
@@ -507,7 +497,6 @@ export default function WaitingRoom() {
               </button>
               <AnimatePresence initial={false}>
                 {infoOpen && (() => {
-                  const dist = cardDistribution(players.length)
                   const timerMins = Math.round((room.settings.round_timer_seconds ?? 60) / 60)
                   const totalRounds = (room.settings as unknown as { total_rounds?: number }).total_rounds ?? 10
                   return (
@@ -524,7 +513,7 @@ export default function WaitingRoom() {
                           ['Max Players', String(room.settings.max_players)],
                           ['Action Timer', `${timerMins} min`],
                           ['Total Rounds', String(totalRounds)],
-                          ['Cards', `${dist.zombieCount}🧟 · ${dist.vaccineCount}💉 · ${dist.shotgunCount}🔫`],
+                          ['Cards', '🧟 infect · 🔫 fire · 💉 cure'],
                         ] as [string,string][]).map(([label, value]) => (
                           <div key={label} style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '6px', borderBottom: '1px dashed var(--color-border)' }}>
                             <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '10px', color: 'var(--color-text-muted)' }}>{label}</span>

@@ -43,6 +43,9 @@ export interface GameState {
   committed_cards: Record<string, unknown>
   phase_deadline: string | null
   updated_at: string
+  // Round-robin scheduling (added in 20260726 migration)
+  round_schedule?: string[][][]
+  total_rounds?: number
 }
 
 interface GameContextValue {

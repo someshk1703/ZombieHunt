@@ -7,13 +7,6 @@ import AtmosphericBackground from '../components/AtmosphericBackground'
 import BackButton from '../components/BackButton'
 import { Copy } from 'lucide-react'
 
-function cardDistribution(players: number) {
-  const zombieCount = Math.min(Math.max(1, Math.floor(players / 5)), players - 1)
-  const vaccineCount = Math.min(Math.max(1, Math.floor(players / 4)), players - zombieCount)
-  const shotgunCount = players - zombieCount
-  return { zombieCount, vaccineCount, shotgunCount }
-}
-
 function SegmentedControl({ options, value, onChange }: { options: { label: string; value: string | number }[]; value: string | number; onChange: (v: string | number) => void }) {
   return (
     <div style={{ display: 'flex' }}>
@@ -71,8 +64,6 @@ export default function CreateRoom() {
   const [loading, setLoading] = useState(false)
   const [createdCode, setCreatedCode] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
-
-  const dist = cardDistribution(maxPlayers)
 
   function validateRoomName(name: string) {
     if (name.trim().length < 3) return 'Room name must be at least 3 characters'
@@ -147,7 +138,7 @@ export default function CreateRoom() {
                 <span className="font-display" style={{ fontSize: '24px', color: 'var(--color-text)', minWidth: '32px', textAlign: 'center' }}>{maxPlayers}</span>
                 <button onClick={() => setMaxPlayers(p => Math.min(20, p + 1))} style={{ width: '32px', height: '32px', border: '1px solid var(--color-border)', background: 'transparent', color: 'var(--color-text)', cursor: 'pointer', borderRadius: '2px', fontSize: '18px' }} onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--color-red)'; e.currentTarget.style.color = 'var(--color-red)' }} onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--color-border)'; e.currentTarget.style.color = 'var(--color-text)' }}>+</button>
               </div>
-              <p style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>↳ {dist.zombieCount} zombie · {dist.vaccineCount} vaccine · {dist.shotgunCount} shotgun cards in play</p>
+              <p style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>↳ infect to survive · fire at enemies · cure allies</p>
             </SettingRow>
 
             <SettingRow label="Action Timer" sub="Time allowed per round">
