@@ -94,7 +94,6 @@ export default function SettingsDrawer({ open, onClose, roomId, currentSettings,
   const [saving, setSaving] = useState(false)
   const [confirmKick, setConfirmKick] = useState(false)
 
-  const dist = cardDistribution(maxPlayers)
   const excessPlayers = currentPlayerCount > maxPlayers ? currentPlayerCount - maxPlayers : 0
 
   async function handleSave() {

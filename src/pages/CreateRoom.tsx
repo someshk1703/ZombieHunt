@@ -75,8 +75,6 @@ export default function CreateRoom() {
   const [createdCode, setCreatedCode] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
 
-  const dist = cardDistribution(maxPlayers)
-
   function validateRoomName(name: string) {
     if (name.trim().length < 3) return 'Room name must be at least 3 characters'
     if (name.trim().length > 32) return 'Room name must be 32 characters or fewer'
