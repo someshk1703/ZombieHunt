@@ -73,13 +73,13 @@ export default function WaitingRoom() {
   const [kickConfirmId, setKickConfirmId] = useState<string | null>(null)
 
   function cardDistribution(count: number) {
-    const zombieCount = Math.min(Math.max(1, Math.floor(count / 5)), count - 1)
-    const vaccineCount = Math.min(Math.max(1, Math.floor(count / 4)), count - zombieCount)
-    return {
-      zombieCount,
-      vaccineCount,
-      shotgunCount: count - zombieCount,
-    }
+    const getZombieCount  = (n: number) => n <= 5 ? 1 : n <= 8 ? 2 : n <= 12 ? 3 : n <= 15 ? 4 : n <= 17 ? 5 : 6
+    const getShotgunCount = (n: number) => { const z = getZombieCount(n); return n <= 8 ? 2 : n <= 17 ? z - 1 : z }
+    const getVaccineCount = (n: number) => n <= 7 ? 2 : n <= 15 ? 3 : 4
+    const zombieCount  = Math.min(getZombieCount(count),  Math.max(1, count - 1))
+    const shotgunCount = Math.min(getShotgunCount(count), count - zombieCount)
+    const vaccineCount = Math.min(getVaccineCount(count), count - zombieCount)
+    return { zombieCount, vaccineCount, shotgunCount }
   }
 
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -507,7 +507,6 @@ export default function WaitingRoom() {
               </button>
               <AnimatePresence initial={false}>
                 {infoOpen && (() => {
-                  const dist = cardDistribution(players.length)
                   const timerMins = Math.round((room.settings.round_timer_seconds ?? 60) / 60)
                   const totalRounds = (room.settings as unknown as { total_rounds?: number }).total_rounds ?? 10
                   return (
@@ -524,7 +523,7 @@ export default function WaitingRoom() {
                           ['Max Players', String(room.settings.max_players)],
                           ['Action Timer', `${timerMins} min`],
                           ['Total Rounds', String(totalRounds)],
-                          ['Cards', `${dist.zombieCount}🧟 · ${dist.vaccineCount}💉 · ${dist.shotgunCount}🔫`],
+                          ['Cards', '🧟 infect · 🔫 fire · 💉 cure'],
                         ] as [string,string][]).map(([label, value]) => (
                           <div key={label} style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '6px', borderBottom: '1px dashed var(--color-border)' }}>
                             <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '10px', color: 'var(--color-text-muted)' }}>{label}</span>

@@ -8,9 +8,12 @@ import BackButton from '../components/BackButton'
 import { Copy } from 'lucide-react'
 
 function cardDistribution(players: number) {
-  const zombieCount = Math.min(Math.max(1, Math.floor(players / 5)), players - 1)
-  const vaccineCount = Math.min(Math.max(1, Math.floor(players / 4)), players - zombieCount)
-  const shotgunCount = players - zombieCount
+  const getZombieCount  = (n: number) => n <= 5 ? 1 : n <= 8 ? 2 : n <= 12 ? 3 : n <= 15 ? 4 : n <= 17 ? 5 : 6
+  const getShotgunCount = (n: number) => { const z = getZombieCount(n); return n <= 8 ? 2 : n <= 17 ? z - 1 : z }
+  const getVaccineCount = (n: number) => n <= 7 ? 2 : n <= 15 ? 3 : 4
+  const zombieCount  = Math.min(getZombieCount(players),  Math.max(1, players - 1))
+  const shotgunCount = Math.min(getShotgunCount(players), players - zombieCount)
+  const vaccineCount = Math.min(getVaccineCount(players), players - zombieCount)
   return { zombieCount, vaccineCount, shotgunCount }
 }
 
@@ -147,7 +150,7 @@ export default function CreateRoom() {
                 <span className="font-display" style={{ fontSize: '24px', color: 'var(--color-text)', minWidth: '32px', textAlign: 'center' }}>{maxPlayers}</span>
                 <button onClick={() => setMaxPlayers(p => Math.min(20, p + 1))} style={{ width: '32px', height: '32px', border: '1px solid var(--color-border)', background: 'transparent', color: 'var(--color-text)', cursor: 'pointer', borderRadius: '2px', fontSize: '18px' }} onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--color-red)'; e.currentTarget.style.color = 'var(--color-red)' }} onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--color-border)'; e.currentTarget.style.color = 'var(--color-text)' }}>+</button>
               </div>
-              <p style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>↳ {dist.zombieCount} zombie · {dist.vaccineCount} vaccine · {dist.shotgunCount} shotgun cards in play</p>
+              <p style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>↳ infect to survive · fire at enemies · cure allies</p>
             </SettingRow>
 
             <SettingRow label="Action Timer" sub="Time allowed per round">

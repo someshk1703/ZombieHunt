@@ -26,6 +26,12 @@ const SPECIAL_STYLES: Record<string, { border: string; shadow: string; color: st
   vaccine: { border: 'rgba(68,153,255,0.5)',  shadow: 'rgba(68,153,255,0.25)', color: '#4499ff' },
 }
 
+const CARD_TYPE_LABELS: Record<string, string> = {
+  zombie:  'INFECT TO SURVIVE',
+  shotgun: 'FIRE AT ENEMIES',
+  vaccine: 'CURE ALLIES',
+}
+
 function valueLabel(value: number): string {
   if (value === 14) return 'A'
   if (value === 13) return 'K'
@@ -173,7 +179,7 @@ export default function CardFace({ card, size = 'md', style }: CardFaceProps) {
             padding: '4px 0',
             letterSpacing: '0.05em',
           }}>
-            {card.type.toUpperCase()}
+            {CARD_TYPE_LABELS[card.type] ?? card.type.toUpperCase()}
           </div>
         </>
       )}

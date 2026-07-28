@@ -217,7 +217,7 @@ export default function SettingsDrawer({ open, onClose, roomId, currentSettings,
                 </button>
               </div>
               <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '10px', color: 'var(--color-text-muted)' }}>
-                ↳ {dist.zombieCount} zombie · {dist.vaccineCount} vaccine · {dist.shotgunCount} shotgun cards
+                ↳ infect to survive · fire at enemies · cure allies
               </p>
               {excessPlayers > 0 && (
                 <p style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '10px', color: 'var(--color-red)', marginTop: '6px' }}>
