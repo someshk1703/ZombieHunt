@@ -72,16 +72,6 @@ export default function WaitingRoom() {
   const [qrDataUrl, setQrDataUrl] = useState('')
   const [kickConfirmId, setKickConfirmId] = useState<string | null>(null)
 
-  function cardDistribution(count: number) {
-    const getZombieCount  = (n: number) => n <= 5 ? 1 : n <= 8 ? 2 : n <= 12 ? 3 : n <= 15 ? 4 : n <= 17 ? 5 : 6
-    const getShotgunCount = (n: number) => { const z = getZombieCount(n); return n <= 8 ? 2 : n <= 17 ? z - 1 : z }
-    const getVaccineCount = (n: number) => n <= 7 ? 2 : n <= 15 ? 3 : 4
-    const zombieCount  = Math.min(getZombieCount(count),  Math.max(1, count - 1))
-    const shotgunCount = Math.min(getShotgunCount(count), count - zombieCount)
-    const vaccineCount = Math.min(getVaccineCount(count), count - zombieCount)
-    return { zombieCount, vaccineCount, shotgunCount }
-  }
-
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const isHost = useMemo(() => players.find(p => p.user_id === user?.id)?.is_host ?? false, [players, user])
   const myPlayer = useMemo(() => players.find(p => p.user_id === user?.id), [players, user])
