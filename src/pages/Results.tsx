@@ -172,7 +172,7 @@ export default function Results() {
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--color-bg)' }}>
+      <div style={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--color-bg)' }}>
         <span style={{ fontFamily: "'IBM Plex Mono', monospace", color: 'var(--color-text-muted)' }}>LOADING RESULTS...</span>
       </div>
     )
@@ -195,15 +195,15 @@ export default function Results() {
   const factionBg = winnerFaction === 'humans' ? 'rgba(0,0,40,0.8)' : 'rgba(0,20,0,0.8)'
 
   return (
-    <div style={{ minHeight: '100vh', position: 'relative' }}>
+    <div style={{ minHeight: '100dvh', position: 'relative' }}>
       <AtmosphericBackground />
-      <div style={{ position: 'relative', zIndex: 1, maxWidth: '900px', margin: '0 auto', padding: '48px 24px' }}>
+      <div style={{ position: 'relative', zIndex: 1, maxWidth: '900px', margin: '0 auto', padding: 'max(32px, calc(var(--safe-top) + 16px)) clamp(12px, 4vw, 24px) max(32px, calc(var(--safe-bottom) + 16px))' }}>
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: '16px' }}>
-          <img src="/assets/zombie_hunt_logo.svg" alt="ZOMBIE HUNT" style={{ width: '180px', height: 'auto', display: 'inline-block' }} />
+          <img src="/assets/zombie_hunt_logo.svg" alt="ZOMBIE HUNT" style={{ width: 'min(180px, 50vw)', height: 'auto', display: 'inline-block' }} />
         </div>
-        <div style={{ border: `2px solid ${factionColor}`, background: factionBg, padding: '24px', marginBottom: '8px', textAlign: 'center' }}>
-          <div style={{ fontFamily: "'Bebas Neue', cursive", fontSize: '48px', color: factionColor, letterSpacing: '0.05em' }}>{factionText}</div>
+        <div style={{ border: `2px solid ${factionColor}`, background: factionBg, padding: 'clamp(12px, 3vw, 24px)', marginBottom: '8px', textAlign: 'center' }}>
+          <div style={{ fontFamily: "'Bebas Neue', cursive", fontSize: 'clamp(28px, 8vw, 48px)', color: factionColor, letterSpacing: '0.05em' }}>{factionText}</div>
         </div>
         <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '12px', color: 'var(--color-text-muted)', textAlign: 'center', marginBottom: '32px' }}>
           GAME COMPLETED — {gameState?.round_number ?? 0} ROUNDS
@@ -214,6 +214,7 @@ export default function Results() {
           {(['scoreboard', 'story'] as Tab[]).map(t => (
             <button key={t} onClick={() => setTab(t)} style={{
               background: 'none', border: 'none', padding: '8px 0', cursor: 'pointer',
+              minHeight: '44px',
               fontFamily: "'IBM Plex Mono', monospace", fontSize: '12px', letterSpacing: '0.1em',
               color: tab === t ? 'var(--color-text)' : 'var(--color-text-muted)',
               borderBottom: tab === t ? '2px solid var(--color-red)' : '2px solid transparent',

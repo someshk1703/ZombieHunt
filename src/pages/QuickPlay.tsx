@@ -151,7 +151,7 @@ export default function QuickPlay() {
   const elapsedStr = `${String(Math.floor(elapsed / 60)).padStart(2, '0')}:${String(elapsed % 60).padStart(2, '0')}`
 
   return (
-    <div style={{ position: 'relative', minHeight: '100vh', zIndex: 1, padding: '48px 16px 32px' }}>
+    <div style={{ position: 'relative', minHeight: '100dvh', zIndex: 1, padding: 'max(48px, calc(var(--safe-top) + 16px)) 16px max(32px, calc(var(--safe-bottom) + 16px))' }}>
       <AtmosphericBackground />
       <div style={{ maxWidth: '600px', margin: '0 auto', position: 'relative', zIndex: 1 }}>
         {/* Header */}

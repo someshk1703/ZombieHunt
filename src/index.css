@@ -18,6 +18,15 @@
   --color-text-muted: #666666;
   --color-warning:    #ff6b00;
 
+  /* Safe area insets (for iPhone notch / home indicator) */
+  --safe-top:    env(safe-area-inset-top,    0px);
+  --safe-right:  env(safe-area-inset-right,  0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left:   env(safe-area-inset-left,   0px);
+
+  /* Touch-friendly minimum sizes */
+  --touch-min: 44px;
+
   /* Surface contrast */
   --color-surface-red:   rgba(28,8,8,0.92);
   --color-surface-green: rgba(8,18,8,0.92);
@@ -53,6 +62,8 @@ html, body, #root {
   height: 100%;
   width: 100%;
   overflow-x: hidden;
+  /* On iOS, allow full-screen including safe areas */
+  height: 100dvh;
 }
 
 body {
@@ -97,6 +108,7 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.15em;
   padding: 12px 24px;
+  min-height: var(--touch-min);
   border-radius: 2px;
   cursor: pointer;
   transition: background 150ms ease, color 150ms ease;
@@ -121,6 +133,7 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.15em;
   padding: 12px 24px;
+  min-height: var(--touch-min);
   border-radius: 2px;
   cursor: pointer;
   transition: border-color 150ms ease, color 150ms ease;
@@ -221,4 +234,44 @@ body {
 
 #root {
   transform: translate(var(--shake-x), var(--shake-y));
+}
+
+/* ── Mobile Global Touch & Safety ───────────────────────────── */
+
+/* Prevent callout on long-press, control text selection in game UI */
+.no-callout {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Improve tap responsiveness */
+button, a, [role="button"] {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Larger touch targets on mobile */
+@media (max-width: 767px) {
+  .btn-primary,
+  .btn-secondary {
+    font-size: 13px;
+    padding: 14px 20px;
+    min-height: 48px;
+    width: 100%;
+  }
+
+  .input-base {
+    font-size: 16px; /* Prevents iOS auto-zoom on focus */
+    padding: 14px 16px;
+    min-height: 48px;
+  }
+}
+
+/* ── Tablet (768px–1024px) ──────────────────────────────────── */
+@media (min-width: 768px) and (max-width: 1024px) {
+  .btn-primary,
+  .btn-secondary {
+    min-height: 46px;
+  }
 }

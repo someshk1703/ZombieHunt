@@ -96,10 +96,15 @@ export default function App() {
       <ToastProvider>
         <AtmosphericBackground />
         <LoadingScreen visible={loading} />
-        <div style={{ position: 'relative', zIndex: 1, minHeight: '100vh' }}>
+        <div style={{ position: 'relative', zIndex: 1, minHeight: '100dvh' }}>
           <AppRoutes />
         </div>
         <AudioControls />
+        {/* Orientation notice for very short landscape phones during game */}
+        <div className="orientation-notice">
+          <span style={{ fontSize: '32px' }}>📱</span>
+          <span>Rotate your device for a better experience</span>
+        </div>
       </ToastProvider>
     </BrowserRouter>
   )

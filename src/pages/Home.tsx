@@ -47,7 +47,7 @@ export default function Home() {
   const hasUsername = Boolean(username)
 
   return (
-    <div style={{ position: 'relative', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', zIndex: 1 }}>
+    <div style={{ position: 'relative', minHeight: '100dvh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', zIndex: 1, paddingTop: 'max(24px, var(--safe-top))', paddingBottom: 'max(24px, var(--safe-bottom))' }}>
       {/* Username Modal — renders on top, cannot be bypassed */}
       <UsernameModal />
 
@@ -71,7 +71,7 @@ export default function Home() {
           <img
             src="/assets/zombie_hunt_logo.svg"
             alt="ZOMBIE HUNT"
-            style={{ width: '100%', maxWidth: '380px', height: 'auto', display: 'block', margin: '0 auto' }}
+            style={{ width: '100%', maxWidth: 'min(380px, 85vw)', height: 'auto', display: 'block', margin: '0 auto' }}
           />
           <p style={{ fontSize: '11px', color: 'var(--color-text-muted)', letterSpacing: '0.3em', marginTop: '8px', textTransform: 'uppercase' }}>
             MULTIPLAYER SURVIVAL CARD GAME
@@ -84,7 +84,7 @@ export default function Home() {
         </p>
 
         {/* Action Buttons */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%', maxWidth: '280px', marginBottom: '24px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', width: '100%', maxWidth: '320px', marginBottom: '24px' }}>
           <button
             className="btn-primary"
             disabled={!hasUsername}
@@ -145,7 +145,7 @@ export default function Home() {
         </div>
 
         {/* Survivors Online */}
-        <p aria-live="polite" aria-atomic="true" style={{ fontSize: '11px', color: 'var(--color-text-muted)', letterSpacing: '0.15em', position: 'fixed', bottom: '24px' }}>
+        <p aria-live="polite" aria-atomic="true" style={{ fontSize: '11px', color: 'var(--color-text-muted)', letterSpacing: '0.15em', position: 'fixed', bottom: 'max(24px, calc(var(--safe-bottom) + 8px))' }}>
           ▸ {survivorsOnline} SURVIVORS ONLINE
         </p>
       </motion.div>

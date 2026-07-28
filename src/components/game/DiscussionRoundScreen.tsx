@@ -158,12 +158,14 @@ export default function DiscussionRoundScreen() {
   return (
     <div
       style={{
-        minHeight: '100vh',
+        minHeight: '100dvh',
         display: 'flex',
         flexDirection: 'column',
         background: 'var(--color-bg)',
         position: 'relative',
         overflow: 'hidden',
+        paddingTop: 'var(--safe-top)',
+        paddingBottom: 'var(--safe-bottom)',
       }}
     >
       {/* TOP BAR */}
@@ -173,7 +175,7 @@ export default function DiscussionRoundScreen() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '0 20px',
+          padding: '0 max(16px, var(--safe-left))',
           background: '#141416',
           borderBottom: '1px solid #383838',
           flexShrink: 0,

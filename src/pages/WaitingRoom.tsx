@@ -353,7 +353,7 @@ export default function WaitingRoom() {
 
   if (loading || !room) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--color-bg)' }}>
+      <div style={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--color-bg)' }}>
         <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '12px', color: 'var(--color-text-muted)', letterSpacing: '0.2em' }}>
           LOADING...
         </span>
@@ -364,7 +364,7 @@ export default function WaitingRoom() {
   // ── Layout ────────────────────────────────────────────────────────────────
   return (
     <div style={{
-      position: 'relative', minHeight: '100vh',
+      position: 'relative', minHeight: '100dvh',
       background: `
         radial-gradient(ellipse 80% 50% at 50% 0%, rgba(80,0,0,0.2) 0%, transparent 70%),
         radial-gradient(ellipse 50% 40% at 90% 100%, rgba(0,40,0,0.12) 0%, transparent 60%),
@@ -386,7 +386,7 @@ export default function WaitingRoom() {
 
       <DevPanel roomId={room.id} />
 
-      <div style={{ position: 'relative', zIndex: 1, maxWidth: '1200px', margin: '0 auto', padding: '24px' }} className="waiting-room-layout">
+      <div style={{ position: 'relative', zIndex: 1, maxWidth: '1200px', margin: '0 auto', padding: 'max(16px, var(--safe-top)) max(16px, var(--safe-right)) max(16px, var(--safe-bottom)) max(16px, var(--safe-left))' }} className="waiting-room-layout">
         {/* Room header */}
         <div
           className="waiting-room-header"
@@ -637,7 +637,7 @@ export default function WaitingRoom() {
           </div>
 
           {/* ── PLAYER CARD GRID ── */}
-          <div style={{ flex: 1, overflowY: 'auto', maxHeight: 'calc(100vh - 160px)' }}>
+          <div style={{ flex: 1, overflowY: 'auto', maxHeight: 'calc(100dvh - 160px)' }}>
             <div style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
