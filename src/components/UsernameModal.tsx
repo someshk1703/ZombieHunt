@@ -63,6 +63,9 @@ export default function UsernameModal() {
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.95 }}
           transition={{ duration: 0.2 }}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="username-modal-title"
           style={{
             position: 'fixed',
             inset: 0,
@@ -86,6 +89,7 @@ export default function UsernameModal() {
             {/* Header */}
             <div style={{ marginBottom: '24px' }}>
               <h2
+                id="username-modal-title"
                 className="font-display"
                 style={{ fontSize: '28px', color: 'var(--color-text)', letterSpacing: '0.05em' }}
               >
@@ -140,9 +144,13 @@ export default function UsernameModal() {
             {/* Input */}
             <div style={{ position: 'relative', marginBottom: '8px' }}>
               <input
+                id="survivor-name-input"
                 className="input-base"
                 type="text"
                 placeholder="Enter survivor name..."
+                aria-label="Survivor name"
+                aria-describedby={error ? 'username-error' : undefined}
+                aria-required="true"
                 value={value}
                 onChange={handleChange}
                 onKeyDown={handleKeyDown}
@@ -173,6 +181,8 @@ export default function UsernameModal() {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0 }}
                   transition={{ duration: 0.15 }}
+                  id="username-error"
+                  role="alert"
                   style={{
                     fontSize: '11px',
                     color: 'var(--color-red)',

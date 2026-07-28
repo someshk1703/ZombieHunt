@@ -145,7 +145,7 @@ export default function Home() {
         </div>
 
         {/* Survivors Online */}
-        <p style={{ fontSize: '11px', color: 'var(--color-text-muted)', letterSpacing: '0.15em', position: 'fixed', bottom: '24px' }}>
+        <p aria-live="polite" aria-atomic="true" style={{ fontSize: '11px', color: 'var(--color-text-muted)', letterSpacing: '0.15em', position: 'fixed', bottom: '24px' }}>
           ▸ {survivorsOnline} SURVIVORS ONLINE
         </p>
       </motion.div>
