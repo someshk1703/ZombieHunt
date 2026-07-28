@@ -181,11 +181,11 @@ export default function Results() {
   const winnerFaction = gameState?.winner_faction
   const winnerPlayerId = gameState?.winner_player_id ?? null
   const winner = players.find(p => p.id === winnerPlayerId)
-  const sorted = sortPlayers(players.filter(p => !p.is_bot), winnerPlayerId, stats)
+  const sorted = sortPlayers(players, winnerPlayerId, stats)
 
-  const aliveNonBots = players.filter(p => !p.is_bot && p.status !== 'eliminated')
-  const aliveHumans = aliveNonBots.filter(p => p.status === 'alive')
-  const aliveZombies = aliveNonBots.filter(p => p.status === 'infected')
+  const aliveAll = players.filter(p => p.status !== 'eliminated')
+  const aliveHumans = aliveAll.filter(p => p.status === 'alive')
+  const aliveZombies = aliveAll.filter(p => p.status === 'infected')
   const isDeadWalkCase = winnerFaction === 'humans' && aliveHumans.length === 1 && aliveZombies.length === 0
 
   const factionColor = winnerFaction === 'humans' ? '#4499ff' : 'var(--color-green)'
@@ -237,9 +237,10 @@ export default function Results() {
               }}>
                 <img src={winner.avatar_url} alt={winner.username} style={{ width: '48px', height: '48px', borderRadius: '50%', border: `2px solid ${factionColor}` }} />
                 <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
                     <span style={{ fontFamily: "'Bebas Neue', cursive", fontSize: '24px', color: 'var(--color-text)' }}>{winner.username}</span>
                     <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '9px', padding: '2px 6px', border: `1px solid ${factionColor}`, color: factionColor }}>WINNER</span>
+                    {winner.is_bot && <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '9px', padding: '2px 6px', border: '1px solid rgba(255,107,0,0.5)', color: 'var(--color-warning)' }}>BOT</span>}
                   </div>
                   <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '4px' }}>
                     {stats[winner.id]?.rounds_survived ?? 0} rounds · {stats[winner.id]?.infections_caused ?? 0} infected
@@ -268,6 +269,7 @@ export default function Results() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <img src={p.avatar_url} alt={p.username} style={{ width: '28px', height: '28px', borderRadius: '50%' }} />
                     <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '13px', color: 'var(--color-text)' }}>{p.username}</span>
+                    {p.is_bot && <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '9px', padding: '1px 5px', border: '1px solid rgba(255,107,0,0.5)', color: 'var(--color-warning)', flexShrink: 0 }}>BOT</span>}
                   </div>
                   <span style={{
                     fontFamily: "'IBM Plex Mono', monospace", fontSize: '10px', padding: '2px 6px',
