@@ -73,16 +73,6 @@ function SegmentedControl({ options, value, onChange }: {
   )
 }
 
-function cardDistribution(players: number) {
-  const zombieCount = Math.min(Math.max(1, Math.floor(players / 5)), players - 1)
-  const vaccineCount = Math.min(Math.max(1, Math.floor(players / 4)), players - zombieCount)
-  return {
-    zombieCount,
-    vaccineCount,
-    shotgunCount: players - zombieCount,
-  }
-}
-
 export default function SettingsDrawer({ open, onClose, roomId, currentSettings, currentPlayerCount }: SettingsDrawerProps) {
   const { showToast } = useToast()
   const [roomName, setRoomName] = useState(currentSettings.room_name ?? '')

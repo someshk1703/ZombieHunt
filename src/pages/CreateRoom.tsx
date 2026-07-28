@@ -7,16 +7,6 @@ import AtmosphericBackground from '../components/AtmosphericBackground'
 import BackButton from '../components/BackButton'
 import { Copy } from 'lucide-react'
 
-function cardDistribution(players: number) {
-  const getZombieCount  = (n: number) => n <= 5 ? 1 : n <= 8 ? 2 : n <= 12 ? 3 : n <= 15 ? 4 : n <= 17 ? 5 : 6
-  const getShotgunCount = (n: number) => { const z = getZombieCount(n); return n <= 8 ? 2 : n <= 17 ? z - 1 : z }
-  const getVaccineCount = (n: number) => n <= 7 ? 2 : n <= 15 ? 3 : 4
-  const zombieCount  = Math.min(getZombieCount(players),  Math.max(1, players - 1))
-  const shotgunCount = Math.min(getShotgunCount(players), players - zombieCount)
-  const vaccineCount = Math.min(getVaccineCount(players), players - zombieCount)
-  return { zombieCount, vaccineCount, shotgunCount }
-}
-
 function SegmentedControl({ options, value, onChange }: { options: { label: string; value: string | number }[]; value: string | number; onChange: (v: string | number) => void }) {
   return (
     <div style={{ display: 'flex' }}>
