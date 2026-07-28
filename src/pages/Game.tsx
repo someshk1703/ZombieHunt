@@ -6,6 +6,7 @@ import { audioManager } from '../lib/audio'
 import { GameProvider, GameRoom, GamePlayer, GameState, useGame } from '../context/GameContext'
 import AtmosphericBackground from '../components/AtmosphericBackground'
 import DevPanel from '../components/DevPanel'
+import VoiceChat from '../components/VoiceChat'
 import DealingScreen from '../components/game/DealingScreen'
 import HandReviewScreen from '../components/game/HandReviewScreen'
 import GameRoundScreen from '../components/game/GameRoundScreen'
@@ -224,6 +225,7 @@ export default function Game() {
   return (
     <GameProvider room={room} initialPlayers={players} gameState={gameState} myPlayer={myPlayer}>
       <GamePhaseRouter />
+      <VoiceChat roomId={room.id} userId={user!.id} />
       <DevPanel roomId={room.id} gameStateId={gameState.id} />
     </GameProvider>
   )
