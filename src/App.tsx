@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, lazy, Suspense } from 'react'
 import { useAuth } from './lib/auth'
 import { useGameStore } from './store/gameStore'
 import { syncServerTime } from './lib/supabase'
@@ -8,12 +8,13 @@ import { ToastProvider } from './components/Toast'
 import AtmosphericBackground from './components/AtmosphericBackground'
 import LoadingScreen from './components/LoadingScreen'
 import AudioControls from './components/AudioControls'
-import Home from './pages/Home'
-import CreateRoom from './pages/CreateRoom'
-import QuickPlay from './pages/QuickPlay'
-import WaitingRoom from './pages/WaitingRoom'
-import Game from './pages/Game'
-import Results from './pages/Results'
+
+const Home = lazy(() => import('./pages/Home'))
+const CreateRoom = lazy(() => import('./pages/CreateRoom'))
+const QuickPlay = lazy(() => import('./pages/QuickPlay'))
+const WaitingRoom = lazy(() => import('./pages/WaitingRoom'))
+const Game = lazy(() => import('./pages/Game'))
+const Results = lazy(() => import('./pages/Results'))
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { username } = useGameStore()
@@ -61,15 +62,17 @@ function AppRoutes() {
   return (
     <>
       <BGMController />
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/lobby/create" element={<ProtectedRoute><CreateRoom /></ProtectedRoute>} />
-        <Route path="/quickplay" element={<ProtectedRoute><QuickPlay /></ProtectedRoute>} />
-        <Route path="/room/:code" element={<WaitingRoom />} />
-        <Route path="/game/:code" element={<ProtectedRoute><Game /></ProtectedRoute>} />
-        <Route path="/results/:code" element={<ProtectedRoute><Results /></ProtectedRoute>} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+      <Suspense fallback={null}>
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/lobby/create" element={<ProtectedRoute><CreateRoom /></ProtectedRoute>} />
+          <Route path="/quickplay" element={<ProtectedRoute><QuickPlay /></ProtectedRoute>} />
+          <Route path="/room/:code" element={<WaitingRoom />} />
+          <Route path="/game/:code" element={<ProtectedRoute><Game /></ProtectedRoute>} />
+          <Route path="/results/:code" element={<ProtectedRoute><Results /></ProtectedRoute>} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
     </>
   )
 }
