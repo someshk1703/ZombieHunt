@@ -368,7 +368,7 @@ export default function GameRoundScreen() {
       onDragEnd={event => { handleDragEnd(event); setDraggedCard(null) }}
       onDragCancel={() => setDraggedCard(null)}
     >
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--color-bg)', position: 'relative', overflow: 'hidden' }}>
+    <div style={{ minHeight: '100dvh', display: 'flex', flexDirection: 'column', background: 'var(--color-bg)', position: 'relative', overflow: 'hidden', paddingTop: 'var(--safe-top)', paddingBottom: 'var(--safe-bottom)' }}>
       {/* Infection alert */}
       <AnimatePresence>
         {infectionPayload && (
@@ -385,7 +385,7 @@ export default function GameRoundScreen() {
       {/* TOP BAR */}
       <div style={{
         height: '48px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '0 16px', background: '#141416', borderBottom: '1px solid #383838',
+        padding: '0 max(12px, var(--safe-left))', background: '#141416', borderBottom: '1px solid #383838',
         position: 'sticky', top: 0, zIndex: 10, flexShrink: 0,
         boxShadow: '0 2px 8px rgba(0,0,0,0.6)',
       }}>

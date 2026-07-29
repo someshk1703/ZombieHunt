@@ -92,7 +92,7 @@ export default function WinRevealScreen() {
   }
 
   return (
-    <div onClick={handleClick} style={{ minHeight: '100vh', background: phase === 'faction' ? factionBg : '#000', position: 'relative', overflow: 'hidden', transition: 'background 1s', cursor: 'pointer' }}>
+    <div onClick={handleClick} style={{ minHeight: '100dvh', background: phase === 'faction' ? factionBg : '#000', position: 'relative', overflow: 'hidden', transition: 'background 1s', cursor: 'pointer' }}>
       {/* GAME OVER flash */}
       <AnimatePresence>
         {phase === 'game_over' && (

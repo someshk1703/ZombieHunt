@@ -126,7 +126,7 @@ export default function RevealScreen() {
 
   if (!currentPair) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--color-bg)' }}>
+      <div style={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--color-bg)' }}>
         <span style={{ fontFamily: "'IBM Plex Mono', monospace", color: 'var(--color-text-muted)', letterSpacing: '0.2em' }}>LOADING RESULTS...</span>
       </div>
     )
@@ -134,7 +134,7 @@ export default function RevealScreen() {
 
   if (done) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--color-bg)', flexDirection: 'column', gap: '16px' }}>
+      <div style={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--color-bg)', flexDirection: 'column', gap: '16px' }}>
         <motion.span
           animate={{ opacity: [1, 0.3, 1] }}
           transition={{ repeat: Infinity, duration: 1 }}
@@ -155,7 +155,7 @@ export default function RevealScreen() {
   return (
     <div
       onClick={handleSkip}
-      style={{ minHeight: '100vh', background: 'rgba(0,0,0,0.9)', position: 'relative', cursor: 'pointer', overflow: 'hidden' }}
+      style={{ minHeight: '100dvh', background: 'rgba(0,0,0,0.9)', position: 'relative', cursor: 'pointer', overflow: 'hidden' }}
     >
       {/* Color splash */}
       <AnimatePresence>
@@ -194,7 +194,7 @@ export default function RevealScreen() {
         )}
       </AnimatePresence>
 
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', gap: '24px', padding: '24px', position: 'relative', zIndex: 10 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100dvh', gap: '24px', padding: '24px', position: 'relative', zIndex: 10 }}>
         {/* SPOTLIGHT: VS display */}
         <motion.div
           key={`spot-${pairIndex}`}

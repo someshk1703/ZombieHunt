@@ -170,25 +170,26 @@ export default function JoinRoomModal({ initialCode = '', canClose = true, onClo
           background: 'rgba(0,0,0,0.7)',
           backdropFilter: 'blur(4px)',
           display: 'flex',
-          alignItems: 'center',
+          alignItems: 'flex-end',
           justifyContent: 'center',
-          padding: '16px',
+          padding: '0',
         }}
         onClick={() => canClose && onClose?.()}
       >
         <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.95 }}
-          transition={{ duration: 0.2 }}
+          initial={{ opacity: 0, y: 60 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 40 }}
+          transition={{ duration: 0.25, ease: 'easeOut' }}
           onClick={e => e.stopPropagation()}
           style={{
             background: 'var(--color-surface)',
             border: '1px solid var(--color-border)',
-            borderRadius: '2px',
-            padding: '32px',
+            borderRadius: '12px 12px 0 0',
+            padding: '32px 28px',
+            paddingBottom: 'max(32px, calc(var(--safe-bottom) + 16px))',
             width: '100%',
-            maxWidth: '420px',
+            maxWidth: '480px',
             position: 'relative',
           }}
         >

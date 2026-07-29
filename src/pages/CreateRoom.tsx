@@ -115,16 +115,16 @@ export default function CreateRoom() {
   const panel: React.CSSProperties = { background: 'var(--color-surface)', border: '1px solid var(--color-border)', padding: '32px', borderRadius: '2px' }
 
   return (
-    <div style={{ position: 'relative', minHeight: '100vh', zIndex: 1, padding: '48px 16px 32px' }}>
+    <div style={{ position: 'relative', minHeight: '100dvh', zIndex: 1, padding: 'max(48px, calc(var(--safe-top) + 16px)) 16px max(32px, calc(var(--safe-bottom) + 16px))' }}>
       <AtmosphericBackground />
       <div style={{ maxWidth: '900px', margin: '0 auto', position: 'relative', zIndex: 1 }}>
-        <div style={{ marginBottom: '32px' }}>
+        <div style={{ marginBottom: '28px' }}>
           <BackButton />
-          <h1 className="font-display" style={{ fontSize: '42px', color: 'var(--color-red)', letterSpacing: '0.05em', marginTop: '12px' }}>CREATE ROOM</h1>
+          <h1 className="font-display" style={{ fontSize: 'clamp(28px, 8vw, 42px)', color: 'var(--color-red)', letterSpacing: '0.05em', marginTop: '12px' }}>CREATE ROOM</h1>
           <p style={{ fontSize: '11px', color: 'var(--color-text-muted)', letterSpacing: '0.15em' }}>Configure your game. Set the rules. Survive.</p>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(300px, 100%), 1fr))', gap: '20px' }}>
           {/* Left — Settings */}
           <div style={panel}>
             <SettingRow label="Room Name">
@@ -134,9 +134,9 @@ export default function CreateRoom() {
 
             <SettingRow label="Max Players">
               <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '8px' }}>
-                <button onClick={() => setMaxPlayers(p => Math.max(3, p - 1))} style={{ width: '32px', height: '32px', border: '1px solid var(--color-border)', background: 'transparent', color: 'var(--color-text)', cursor: 'pointer', borderRadius: '2px', fontSize: '18px' }} onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--color-red)'; e.currentTarget.style.color = 'var(--color-red)' }} onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--color-border)'; e.currentTarget.style.color = 'var(--color-text)' }}>−</button>
+                <button onClick={() => setMaxPlayers(p => Math.max(3, p - 1))} style={{ width: '44px', height: '44px', border: '1px solid var(--color-border)', background: 'transparent', color: 'var(--color-text)', cursor: 'pointer', borderRadius: '2px', fontSize: '20px', touchAction: 'manipulation' }} onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--color-red)'; e.currentTarget.style.color = 'var(--color-red)' }} onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--color-border)'; e.currentTarget.style.color = 'var(--color-text)' }}>−</button>
                 <span className="font-display" style={{ fontSize: '24px', color: 'var(--color-text)', minWidth: '32px', textAlign: 'center' }}>{maxPlayers}</span>
-                <button onClick={() => setMaxPlayers(p => Math.min(20, p + 1))} style={{ width: '32px', height: '32px', border: '1px solid var(--color-border)', background: 'transparent', color: 'var(--color-text)', cursor: 'pointer', borderRadius: '2px', fontSize: '18px' }} onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--color-red)'; e.currentTarget.style.color = 'var(--color-red)' }} onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--color-border)'; e.currentTarget.style.color = 'var(--color-text)' }}>+</button>
+                <button onClick={() => setMaxPlayers(p => Math.min(20, p + 1))} style={{ width: '44px', height: '44px', border: '1px solid var(--color-border)', background: 'transparent', color: 'var(--color-text)', cursor: 'pointer', borderRadius: '2px', fontSize: '20px', touchAction: 'manipulation' }} onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--color-red)'; e.currentTarget.style.color = 'var(--color-red)' }} onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--color-border)'; e.currentTarget.style.color = 'var(--color-text)' }}>+</button>
               </div>
               <p style={{ fontSize: '10px', color: 'var(--color-text-muted)' }}>↳ infect to survive · fire at enemies · cure allies</p>
             </SettingRow>

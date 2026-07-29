@@ -36,7 +36,7 @@ function ByeWaitingScreen({
 
   return (
     <div style={{
-      minHeight: '100vh',
+      minHeight: '100dvh',
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
@@ -125,7 +125,7 @@ function GamePhaseRouter() {
 
   if (isGhost && !showDeathScreen) {
     return (
-      <div style={{ position: 'relative', minHeight: '100vh' }}>
+      <div style={{ position: 'relative', minHeight: '100dvh' }}>
         <AtmosphericBackground />
         <GhostOverlay />
       </div>
@@ -133,7 +133,7 @@ function GamePhaseRouter() {
   }
 
   return (
-    <div style={{ position: 'relative', minHeight: '100vh' }}>
+    <div style={{ position: 'relative', minHeight: '100dvh' }}>
       <AtmosphericBackground />
       {showDeathScreen && (
         <DeathScreen
@@ -214,7 +214,7 @@ export default function Game() {
 
   if (loading || !room || !gameState || !myPlayer) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--color-bg)' }}>
+      <div style={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--color-bg)' }}>
         <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '12px', color: 'var(--color-text-muted)', letterSpacing: '0.2em' }}>
           LOADING GAME...
         </span>

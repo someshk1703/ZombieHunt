@@ -172,7 +172,7 @@ export default function Results() {
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--color-bg)' }}>
+      <div style={{ minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--color-bg)' }}>
         <span style={{ fontFamily: "'IBM Plex Mono', monospace", color: 'var(--color-text-muted)' }}>LOADING RESULTS...</span>
       </div>
     )
@@ -181,11 +181,11 @@ export default function Results() {
   const winnerFaction = gameState?.winner_faction
   const winnerPlayerId = gameState?.winner_player_id ?? null
   const winner = players.find(p => p.id === winnerPlayerId)
-  const sorted = sortPlayers(players.filter(p => !p.is_bot), winnerPlayerId, stats)
+  const sorted = sortPlayers(players, winnerPlayerId, stats)
 
-  const aliveNonBots = players.filter(p => !p.is_bot && p.status !== 'eliminated')
-  const aliveHumans = aliveNonBots.filter(p => p.status === 'alive')
-  const aliveZombies = aliveNonBots.filter(p => p.status === 'infected')
+  const aliveAll = players.filter(p => p.status !== 'eliminated')
+  const aliveHumans = aliveAll.filter(p => p.status === 'alive')
+  const aliveZombies = aliveAll.filter(p => p.status === 'infected')
   const isDeadWalkCase = winnerFaction === 'humans' && aliveHumans.length === 1 && aliveZombies.length === 0
 
   const factionColor = winnerFaction === 'humans' ? '#4499ff' : 'var(--color-green)'
@@ -195,15 +195,15 @@ export default function Results() {
   const factionBg = winnerFaction === 'humans' ? 'rgba(0,0,40,0.8)' : 'rgba(0,20,0,0.8)'
 
   return (
-    <div style={{ minHeight: '100vh', position: 'relative' }}>
+    <div style={{ minHeight: '100dvh', position: 'relative' }}>
       <AtmosphericBackground />
-      <div style={{ position: 'relative', zIndex: 1, maxWidth: '900px', margin: '0 auto', padding: '48px 24px' }}>
+      <div style={{ position: 'relative', zIndex: 1, maxWidth: '900px', margin: '0 auto', padding: 'max(32px, calc(var(--safe-top) + 16px)) clamp(12px, 4vw, 24px) max(32px, calc(var(--safe-bottom) + 16px))' }}>
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: '16px' }}>
-          <img src="/assets/zombie_hunt_logo.svg" alt="ZOMBIE HUNT" style={{ width: '180px', height: 'auto', display: 'inline-block' }} />
+          <img src="/assets/zombie_hunt_logo.svg" alt="ZOMBIE HUNT" style={{ width: 'min(180px, 50vw)', height: 'auto', display: 'inline-block' }} />
         </div>
-        <div style={{ border: `2px solid ${factionColor}`, background: factionBg, padding: '24px', marginBottom: '8px', textAlign: 'center' }}>
-          <div style={{ fontFamily: "'Bebas Neue', cursive", fontSize: '48px', color: factionColor, letterSpacing: '0.05em' }}>{factionText}</div>
+        <div style={{ border: `2px solid ${factionColor}`, background: factionBg, padding: 'clamp(12px, 3vw, 24px)', marginBottom: '8px', textAlign: 'center' }}>
+          <div style={{ fontFamily: "'Bebas Neue', cursive", fontSize: 'clamp(28px, 8vw, 48px)', color: factionColor, letterSpacing: '0.05em' }}>{factionText}</div>
         </div>
         <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '12px', color: 'var(--color-text-muted)', textAlign: 'center', marginBottom: '32px' }}>
           GAME COMPLETED — {gameState?.round_number ?? 0} ROUNDS
@@ -214,6 +214,7 @@ export default function Results() {
           {(['scoreboard', 'story'] as Tab[]).map(t => (
             <button key={t} onClick={() => setTab(t)} style={{
               background: 'none', border: 'none', padding: '8px 0', cursor: 'pointer',
+              minHeight: '44px',
               fontFamily: "'IBM Plex Mono', monospace", fontSize: '12px', letterSpacing: '0.1em',
               color: tab === t ? 'var(--color-text)' : 'var(--color-text-muted)',
               borderBottom: tab === t ? '2px solid var(--color-red)' : '2px solid transparent',
@@ -236,9 +237,10 @@ export default function Results() {
               }}>
                 <img src={winner.avatar_url} alt={winner.username} style={{ width: '48px', height: '48px', borderRadius: '50%', border: `2px solid ${factionColor}` }} />
                 <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
                     <span style={{ fontFamily: "'Bebas Neue', cursive", fontSize: '24px', color: 'var(--color-text)' }}>{winner.username}</span>
                     <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '9px', padding: '2px 6px', border: `1px solid ${factionColor}`, color: factionColor }}>WINNER</span>
+                    {winner.is_bot && <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '9px', padding: '2px 6px', border: '1px solid rgba(255,107,0,0.5)', color: 'var(--color-warning)' }}>BOT</span>}
                   </div>
                   <div style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '4px' }}>
                     {stats[winner.id]?.rounds_survived ?? 0} rounds · {stats[winner.id]?.infections_caused ?? 0} infected
@@ -267,6 +269,7 @@ export default function Results() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <img src={p.avatar_url} alt={p.username} style={{ width: '28px', height: '28px', borderRadius: '50%' }} />
                     <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '13px', color: 'var(--color-text)' }}>{p.username}</span>
+                    {p.is_bot && <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: '9px', padding: '1px 5px', border: '1px solid rgba(255,107,0,0.5)', color: 'var(--color-warning)', flexShrink: 0 }}>BOT</span>}
                   </div>
                   <span style={{
                     fontFamily: "'IBM Plex Mono', monospace", fontSize: '10px', padding: '2px 6px',

@@ -196,8 +196,10 @@ export default function HandReviewScreen() {
 
   return (
     <div style={{
-      minHeight: '100vh', display: 'flex', flexDirection: 'column',
+      minHeight: '100dvh', display: 'flex', flexDirection: 'column',
       background: 'var(--color-bg)',
+      paddingTop: 'var(--safe-top)',
+      paddingBottom: 'var(--safe-bottom)',
     }}>
       {/* TOP (20%) */}
       <div style={{ flex: '0 0 20%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', padding: '24px 24px 16px' }}>
